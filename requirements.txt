@@ -7,3 +7,5 @@ imageio
 tqdm
 requests
 pandas
+zarr
+fsspec[http]

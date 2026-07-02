@@ -1,16 +1,26 @@
 #!/usr/bin/env python3
 """
 Script to identify images with the largest prediction errors and download them from IDR.
+
+Since IDR migrated to OME-Zarr (mid-2025), pixel data is no longer served through the
+old webclient render_image endpoint.  Images are now accessed by reading the OME-Zarr
+stores hosted on the EBI S3 bucket:
+
+    https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.4/...
+
+The Zarr path for each image is discovered via the IDR file-annotations API and then
+downloaded with the ``zarr`` + ``fsspec[http]`` libraries.  No login is required.
 """
 
 import argparse
 from pathlib import Path
-from io import BytesIO
 
 import imageio.v3 as iio
 import numpy as np
 import pandas as pd
 import requests
+import zarr
+import fsspec
 
 
 def get_idr_metadata(image_id):
@@ -94,115 +104,138 @@ def get_idr_metadata(image_id):
     return metadata
 
 
-def _login_idr_session(session):
+def get_zarr_url(image_id):
     """
-    Log in to IDR as the public guest user to obtain a session cookie.
+    Discover the OME-Zarr S3 URL for an IDR image.
 
-    The IDR webclient render endpoints require an authenticated session even
-    for public data.  Credentials are the well-known public guest account.
+    IDR stores Zarr data at ``https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.4/``.
+    The path within that bucket is stored as a file annotation on the image (or its
+    parent well/plate) in IDR.  This function queries the IDR file-annotations API
+    to find that path.
+
+    Strategy (tried in order):
+    1. File annotations directly on the image.
+    2. File annotations on the parent well (HCS data).
+    3. File annotations on the parent plate (HCS data).
+
+    Args:
+        image_id: The IDR image ID.
+
+    Returns:
+        A full HTTPS URL to the OME-Zarr store, or ``None`` if not found.
     """
     base = "https://idr.openmicroscopy.org"
-    # Fetch login page to get CSRF token
-    r = session.get(f"{base}/webclient/login/", timeout=15)
-    r.raise_for_status()
-    csrf = session.cookies.get('csrftoken', '')
-    login_data = {
-        'username': 'public',
-        'password': 'public',
-        'csrfmiddlewaretoken': csrf,
-        'server': 1,
-        'noredirect': 1,
-    }
-    r_login = session.post(
-        f"{base}/webclient/login/",
-        data=login_data,
-        headers={'Referer': f"{base}/webclient/login/"},
-        timeout=15
+    s3_base = "https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.4"
+
+    def _find_zarr_in_annotations(url):
+        """Return the Zarr path from file annotations at *url*, or None."""
+        try:
+            r = requests.get(url, timeout=10)
+            if r.status_code != 200:
+                return None
+            for ann in r.json().get('annotations', []):
+                path = ann.get('file', {}).get('path', '') or ann.get('fileName', '')
+                if '.zarr' in path:
+                    # Strip any leading slash and return the full S3 URL
+                    return f"{s3_base}/{path.lstrip('/')}"
+        except Exception:
+            pass
+        return None
+
+    # 1. Annotations directly on the image
+    zarr_url = _find_zarr_in_annotations(
+        f"{base}/webclient/api/annotations/?type=file&image={image_id}"
     )
-    r_login.raise_for_status()
+    if zarr_url:
+        return zarr_url
+
+    # 2 & 3. For HCS images, look up the well and plate
+    try:
+        r_img = requests.get(f"{base}/webclient/imgData/{image_id}/", timeout=10)
+        if r_img.status_code == 200:
+            meta = r_img.json().get('meta', {})
+            well_id = meta.get('wellId')
+            if well_id:
+                zarr_url = _find_zarr_in_annotations(
+                    f"{base}/webclient/api/annotations/?type=file&well={well_id}"
+                )
+                if zarr_url:
+                    return zarr_url
+                # Try the plate
+                r_plates = requests.get(
+                    f"{base}/api/v0/m/wells/{well_id}/plates/", timeout=10
+                )
+                if r_plates.status_code == 200:
+                    plates = r_plates.json().get('data', [])
+                    if plates:
+                        plate_id = plates[0].get('@id')
+                        zarr_url = _find_zarr_in_annotations(
+                            f"{base}/webclient/api/annotations/?type=file&plate={plate_id}"
+                        )
+                        if zarr_url:
+                            return zarr_url
+    except Exception:
+        pass
+
+    return None
 
 
-def download_idr_image(image_id, output_dir, session, timeout=120):
+def download_idr_image(image_id, output_dir, timeout=120):
     """
     Download all channel planes for an IDR image and save as a multi-channel TIFF.
 
-    Uses the IDR webclient render_image endpoint (one request per channel plane),
-    the same approach used by the original IDR training-data download scripts.
+    Uses the OME-Zarr store hosted on the EBI S3 bucket, which is the access method
+    recommended by IDR following their migration to OME-Zarr infrastructure (mid-2025).
+    No authentication is required; the bucket is publicly readable over HTTPS.
 
-    The render_image endpoint requires:
-      - An authenticated session (public/public login)
-      - Channel specs in OMERO format: ``N|min:max$RRGGBB`` for each channel,
-        with a leading ``-`` to render a channel as inactive (grayscale isolate).
-      - The ``m=g`` (greyscale model) and ``format=tif`` query parameters.
-      - Special characters (``|``, ``$``) must NOT be URL-encoded.
-
-    Note: Some older IDR datasets have their pixel files archived on a storage
-    volume (``demo_2``) that is no longer mounted on the rendering servers.
-    These images will fail with a pixel-buffer error; this is an IDR-side
-    infrastructure limitation and cannot be resolved client-side.
+    The Zarr URL is discovered automatically via the IDR file-annotations API.
+    The OME-Zarr array layout is ``(T, C, Z, Y, X)``; this function extracts the
+    first T and Z plane for every channel and saves a ``(C, Y, X)`` multi-channel TIFF.
 
     Args:
-        image_id: The IDR image ID to download
-        output_dir: Directory to save the downloaded file
-        session: requests.Session to use (shared across calls for efficiency)
-        timeout: HTTP request timeout in seconds per channel request
+        image_id: The IDR image ID to download.
+        output_dir: Directory to save the downloaded file.
+        timeout: Not used directly (retained for API compatibility); zarr uses fsspec
+                 default timeouts for HTTP.
 
     Returns:
-        Path to the saved TIFF file, or None if the download failed
+        Path to the saved TIFF file, or None if the download failed.
     """
-    base_url = "https://idr.openmicroscopy.org"
     output_path = Path(output_dir) / f"image_{image_id}.tif"
 
     try:
-        # 1. Fetch image dimensions and verify pixel accessibility via imgData
-        r_check = session.get(f"{base_url}/webgateway/imgData/{image_id}/", timeout=30)
-        if r_check.status_code == 200:
-            idata = r_check.json()
-            exc = idata.get('Exception')
-            if exc:
-                print(f"  [SKIP] Pixel buffer unavailable (archived dataset): {exc[:80]}")
-                return None
-            channels = idata.get('channels', [])
-            size_c = len(channels)
-        else:
-            # Fall back to the JSON API for dimensions
-            r_meta = session.get(f"{base_url}/api/v0/m/images/{image_id}/", timeout=30)
-            r_meta.raise_for_status()
-            size_c = r_meta.json().get('data', {}).get('Pixels', {}).get('SizeC', 1)
-
-        if size_c == 0:
-            print(f"  [WARN] Could not determine channel count for image {image_id}")
+        # 1. Find the Zarr store URL for this image
+        zarr_url = get_zarr_url(image_id)
+        if not zarr_url:
+            print(f"  [SKIP] No OME-Zarr store found for image {image_id} "
+                  f"(study may not yet be converted to Zarr)")
             return None
 
-        # 2. Download each channel plane individually (Z=0, T=0)
-        #    Use the simple c=N query parameter — the same approach used by the original
-        #    generate-training-data-web-api.py script.  render_image renders one channel
-        #    at a time as an 8-bit greyscale/RGB TIFF.  The complex "N|min:max$COLOR"
-        #    channel-spec syntax is NOT used here; it causes HTTP 400 errors on IDR.
-        planes = []
-        for c in range(size_c):
-            url = f"{base_url}/webclient/render_image/{image_id}/"
-            params = {"c": c, "z": 0, "t": 0, "format": "tif"}
-            r_plane = session.get(url, params=params, timeout=timeout)
-            if r_plane.status_code != 200:
-                msg = r_plane.content[:100].decode('utf-8', errors='replace')
-                if r_plane.status_code == 404 and 'Cannot find Image' in msg:
-                    print(f"  [SKIP] Image {image_id} not available on IDR render servers "
-                          f"(pixel data may be on offline storage)")
-                else:
-                    print(f"  [ERROR] Channel {c} returned HTTP {r_plane.status_code}: {msg}")
-                return None
-            plane = iio.imread(BytesIO(r_plane.content))
-            if plane.ndim > 2:
-                plane = np.squeeze(plane)
-            # render_image returns an 8-bit greyscale or RGB TIFF; flatten to 2-D
-            if plane.ndim == 3:
-                plane = plane[:, :, 0]
-            planes.append(plane)
+        print(f"  Zarr: {zarr_url}")
 
-        # 3. Stack channels and save as multi-channel TIFF
-        # Shape: (SizeC, SizeY, SizeX) — standard channel-first layout
-        stack = np.stack(planes, axis=0)
+        # 2. Open the Zarr store over HTTP using fsspec
+        mapper = fsspec.get_mapper(zarr_url)
+        root = zarr.open(mapper, mode='r')
+
+        # OME-Zarr multi-scale layout: resolution levels are '0', '1', ...
+        # Use the highest resolution (level '0').
+        if '0' not in root:
+            print(f"  [ERROR] Unexpected Zarr structure for image {image_id}: "
+                  f"no '0' array found.  Keys: {list(root.keys())}")
+            return None
+
+        arr = root['0']  # shape: (T, C, Z, Y, X)
+        if arr.ndim < 5:
+            print(f"  [ERROR] Unexpected array ndim={arr.ndim} for image {image_id}")
+            return None
+
+        size_c = arr.shape[1]
+
+        # 3. Extract first T=0, Z=0 plane for every channel → (C, Y, X)
+        planes = [arr[0, c, 0, :, :] for c in range(size_c)]
+        stack = np.stack(planes, axis=0)  # (C, Y, X)
+
+        # 4. Save as multi-channel TIFF
         iio.imwrite(str(output_path), stack, extension='.tif')
 
         if output_path.stat().st_size > 0:
@@ -246,15 +279,6 @@ def main():
 
     args = parser.parse_args()
 
-    # Shared session for IDR requests — log in once as the public guest
-    idr_session = requests.Session()
-    print("Logging in to IDR as public guest...")
-    try:
-        _login_idr_session(idr_session)
-        print("  Login OK")
-    except Exception as e:
-        print(f"  Login failed: {e} — downloads may fail")
-
     # Load the CSV file
     print(f"Loading CSV file: {args.csv_file}")
     df = pd.read_csv(args.csv_file)
@@ -295,7 +319,7 @@ def main():
         error = row['Error']
 
         print(f"Image_ID {image_id} (error: {error:.4f}): downloading from IDR...", end=" ", flush=True)
-        downloaded_file = download_idr_image(image_id, output_path, idr_session, timeout=args.timeout)
+        downloaded_file = download_idr_image(image_id, output_path, timeout=args.timeout)
 
         if downloaded_file:
             size_mb = downloaded_file.stat().st_size / (1024 * 1024)
@@ -312,7 +336,6 @@ def main():
     print(f"  Failed downloads: {failed_count}")
     print(f"  Output directory: {output_path.absolute()}")
     print("=" * 70)
-    idr_session.close()
 
 
 if __name__ == "__main__":
