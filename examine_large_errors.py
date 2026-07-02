@@ -8,6 +8,59 @@ import shutil
 from pathlib import Path
 
 import pandas as pd
+import requests
+
+
+def get_idr_metadata(image_id):
+    """
+    Fetch metadata for a given image ID from IDR API.
+
+    Args:
+        image_id: The image ID to query
+
+    Returns:
+        Dictionary containing channel names, project ID, etc.
+    """
+    base_url = f"https://idr.openmicroscopy.org/api/v0/m/images/{image_id}/"
+    metadata = {
+        "Channels": "N/A",
+        "Project": "N/A",
+        "Dataset": "N/A",
+        "Name": "N/A"
+    }
+
+    try:
+        # 1. Get basic image info and channels
+        r = requests.get(base_url, timeout=10)
+        if r.status_code == 200:
+            data = r.json().get('data', {})
+            metadata["Name"] = data.get('Name', 'N/A')
+            pixels = data.get('Pixels', {})
+            channels = pixels.get('Channels', [])
+            if channels:
+                metadata["Channels"] = ", ".join([c.get('Name', 'Unknown') for c in channels])
+
+        # 2. Get Dataset info
+        r_ds = requests.get(f"{base_url}datasets/", timeout=10)
+        if r_ds.status_code == 200:
+            datasets = r_ds.json().get('data', [])
+            if datasets:
+                ds = datasets[0]
+                metadata["Dataset"] = ds.get('Name', 'N/A')
+                ds_id = ds.get('@id')
+
+                # 3. Get Project info
+                r_prj = requests.get(f"https://idr.openmicroscopy.org/api/v0/m/datasets/{ds_id}/projects/", timeout=10)
+                if r_prj.status_code == 200:
+                    projects = r_prj.json().get('data', [])
+                    if projects:
+                        metadata["Project"] = projects[0].get('Name', 'N/A')
+
+    except Exception:
+        # Silently fail for metadata, just return N/A
+        pass
+
+    return metadata
 
 
 def find_image_files(image_id, data_root):
@@ -75,14 +128,18 @@ def main():
     # Sort by error in descending order and get top N
     df_sorted = df.nlargest(args.top_n, 'Error')
 
-    print(f"\nTop {args.top_n} images with largest prediction errors:")
-    print("-" * 70)
-    print(f"{'Image_ID':<15} {'Actual':<10} {'Predicted':<12} {'Error':<10}")
-    print("-" * 70)
+    print(f"\nTop {args.top_n} images with largest prediction errors and IDR metadata:")
+    print("-" * 150)
+    print(f"{'Image_ID':<10} {'Actual':<10} {'Predicted':<12} {'Error':<10} {'Channels':<30} {'Project':<30} {'Dataset':<30}")
+    print("-" * 150)
 
     for idx, row in df_sorted.iterrows():
+        image_id_val = int(row['Image_ID'])
+        metadata = get_idr_metadata(image_id_val)
+        
         print(
-            f"{row['Image_ID']:<15} {row['Actual_Label']:<10.4f} {row['Predicted_Label']:<12.4f} {row['Error']:<10.4f}")
+            f"{row['Image_ID']:<10} {row['Actual_Label']:<10.4f} {row['Predicted_Label']:<12.4f} {row['Error']:<10.4f} "
+            f"{metadata['Channels'][:28]:<30} {metadata['Project'][:28]:<30} {metadata['Dataset'][:28]:<30}")
 
     # Create output directory
     output_path = Path(args.output_dir)
