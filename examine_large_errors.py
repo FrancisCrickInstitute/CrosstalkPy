@@ -40,7 +40,7 @@ def get_idr_metadata(image_id):
             if channels:
                 metadata["Channels"] = ", ".join([c.get('Name', 'Unknown') for c in channels])
 
-        # 2. Get Dataset info
+        # 2. Get Dataset/Project info (for non-HCS images)
         r_ds = requests.get(f"{base_url}datasets/", timeout=10)
         if r_ds.status_code == 200:
             datasets = r_ds.json().get('data', [])
@@ -55,6 +55,35 @@ def get_idr_metadata(image_id):
                     projects = r_prj.json().get('data', [])
                     if projects:
                         metadata["Project"] = projects[0].get('Name', 'N/A')
+
+        # 4. Fallback for HCS images (plates/screens) — datasets/ returns empty for these
+        if metadata["Dataset"] == "N/A":
+            r_img_data = requests.get(
+                f"https://idr.openmicroscopy.org/webclient/imgData/{image_id}/",
+                timeout=10
+            )
+            if r_img_data.status_code == 200:
+                img_data = r_img_data.json()
+                well_id = img_data.get('meta', {}).get('wellId')
+                if well_id:
+                    r_plates = requests.get(
+                        f"https://idr.openmicroscopy.org/api/v0/m/wells/{well_id}/plates/",
+                        timeout=10
+                    )
+                    if r_plates.status_code == 200:
+                        plates = r_plates.json().get('data', [])
+                        if plates:
+                            plate = plates[0]
+                            metadata["Dataset"] = f"Plate: {plate.get('Name', 'N/A')}"
+                            plate_id = plate.get('@id')
+                            r_screens = requests.get(
+                                f"https://idr.openmicroscopy.org/api/v0/m/plates/{plate_id}/screens/",
+                                timeout=10
+                            )
+                            if r_screens.status_code == 200:
+                                screens = r_screens.json().get('data', [])
+                                if screens:
+                                    metadata["Project"] = f"Screen: {screens[0].get('Name', 'N/A')}"
 
     except Exception:
         # Silently fail for metadata, just return N/A
