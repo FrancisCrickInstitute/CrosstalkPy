@@ -1,0 +1,24 @@
+[workspace]
+authors = ["Dave Barry <david.barry@crick.ac.uk>"]
+channels = ["conda-forge"]
+name = "Torch-UNet"
+platforms = ["win-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+python = ">=3.14.7,<3.15"
+pixi-pycharm = ">=0.0.12,<0.0.13"
+
+[environments]
+crosstalk = ["default"]
+
+[pypi-dependencies]
+numpy = ">=2.5.2, <3"
+torch = ">=2.14.0, <3"
+matplotlib = ">=3.11.1, <4"
+pillow = ">=12.3.0, <13"
+torchvision = ">=0.29.0, <0.30"
+imageio = ">=2.37.4, <3"
+tqdm = ">=4.70.0, <5"
