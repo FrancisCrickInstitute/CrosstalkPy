@@ -385,6 +385,21 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, num_epoch
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             optimizer, T_max=num_epochs, eta_min=1e-8
         )
+    elif scheduler_config['type'] == 'custom_warmup':
+        params = scheduler_config['params']
+        warmup_epochs = params['warmup_epochs']
+        max_lr = params['max_lr']
+        final_lr = params['final_lr']
+        total_epochs = params['total_epochs']
+
+        def lr_lambda(epoch):
+            # Linear warmup from ~0 to max_lr, then cosine decay to final_lr
+            if epoch < warmup_epochs:
+                return (epoch + 1) / warmup_epochs
+            progress = (epoch - warmup_epochs) / max(1, total_epochs - warmup_epochs)
+            return (final_lr + (max_lr - final_lr) * (1 + np.cos(np.pi * progress)) / 2) / max_lr
+
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 
     model.to(device)
     best_val_loss = float('inf')
