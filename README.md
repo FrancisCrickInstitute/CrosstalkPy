@@ -1,5 +1,11 @@
 # CrosstalkPy: A Python Package to Detect CrossTalk in Microscopy Images
 
+<img width="45%" alt="test_Pearsons Correlation_plot_2025-12-16_11-37-05" src="https://github.com/user-attachments/assets/3aeb6b4c-2415-4a15-8c12-c233ca11a0a5" /> <img width="45%" alt="test_Predicted_Label_plot_2025-12-16_11-37-05" src="https://github.com/user-attachments/assets/a18fe6b7-86c4-4c4e-be43-7305e45f8b7f" />
+
+CrosstalkPy is a regression-based deep-learning model designed to detect cross-talk (bleed-through) between different channels in fluorescence microscopy images. Trained on a wide selection of approximately 40,000 images from the [Image Data Resource](https://idr.openmicroscopy.org/), CrosstalkPy is microscope- and sample-agnostic.
+
+We developed CrosstalkPy because standard measures of cross-talk, such as Pearson's Correlation Coefficient, are not reliable (see above).
+
 ## Setup
 
 ### Step 1: Install a Python Distribution
