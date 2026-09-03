@@ -13,6 +13,7 @@ import torchvision.transforms.functional as TF
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
+from model_factory import build_model, load_model
 from regression_model import *
 from two_branch_regression import *
 
@@ -546,10 +547,7 @@ if __name__ == "__main__":
     if not (abs(train_ratio + val_ratio) < 1.0):
         print("Warning: Sum of TRAIN_RATIO, VAL_RATIO, TEST_RATIO does not equal 1.0.")
 
-    if model_selection == 'double':
-        model = SimplifiedTwoBranchRegressionModel(initial_filters_per_branch=64)
-    else:
-        model = AdvancedRegressionModel(initial_filters=128, num_conv_blocks=6)
+    model = build_model(model_selection)
     print(f'Using {ncpus} cpu workers.')
 
     # --- Create a unique output directory for this run ---
@@ -679,13 +677,7 @@ if __name__ == "__main__":
     plt.close()  # Close the plot to free memory
 
     print("\n--- Evaluating Model ---")
-    if model_selection == 'double':
-        loaded_model = SimplifiedTwoBranchRegressionModel(initial_filters_per_branch=64)
-    else:
-        loaded_model = AdvancedRegressionModel(initial_filters=128, num_conv_blocks=6)
-    loaded_model.load_state_dict(torch.load(model_save_path, map_location=device))
-    loaded_model.eval()
-    loaded_model.to(device)
+    loaded_model = load_model(model_save_path, model_selection, device)
 
     evaluate_and_save(loaded_model, test_dataloader, 'test', output_dir_name)
     evaluate_and_save(loaded_model, train_dataloader, 'train', output_dir_name)
