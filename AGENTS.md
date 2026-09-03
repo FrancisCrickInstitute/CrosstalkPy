@@ -169,6 +169,24 @@ Consequences:
 - Do not assume renaming files here (e.g. `regression_model.py`) is safe; the
   downstream repo has its own copy and matches only by checkpoint contract.
 
+### Self-contained export (TorchScript `.pt`)
+
+`model_factory.save_torchscript(model, path)` exports the model as a single
+`.pt` file that bundles architecture + weights. Consumers load it with
+`torch.jit.load(path)` and call it directly — no class definition or constructor
+args needed, and batch size stays dynamic. This is the recommended artifact to
+hand to external projects instead of the raw `.pth` state_dict (which requires
+re-instantiating the architecture).
+
+`train_model.py` now writes both the `.pth` (state_dict, for resume/reload) and
+a `.pt` (TorchScript, for external consumers) alongside each other.
+
+Gothca: `torch.jit.script` emits a `FutureWarning` on Python 3.14+ and upstream
+recommends `torch.export` as the replacement, but `torch.export` shape-specializes
+its input (batch becomes fixed at export time) and rejects other batch sizes.
+For this PyTorch-only, dynamic-batch use case, TorchScript still works and is
+the pragmatic choice. Revisit if a future PyTorch removes `torch.jit`.
+
 ## Data Layout
 
 - `Training_Data/Mixed/` and `Training_Data/Source/` — paired `.tif` images

@@ -55,3 +55,27 @@ def load_model(model_path, model_selection, device):
     model.eval()
     model.to(device)
     return model
+
+
+def save_torchscript(model, save_path, example_input=None):
+    """Export the model as a self-contained TorchScript artifact.
+
+    Unlike saving `state_dict`, this bundles the architecture *and* the weights
+    into a single file. Consumers load it with `torch.jit.load` in eval mode and
+    call it directly, without importing the model class or knowing the
+    architecture (they only need to know the input shape). Batch size stays
+    dynamic.
+
+    Note: `torch.jit.script` emits a FutureWarning on Python 3.14+ and is slated
+    for replacement by `torch.export`, but it still functions correctly and
+    supports dynamic batch (which `torch.export` does not without static shape
+    specialization). Revisit if/when TorchScript is removed in a future PyTorch.
+
+    Args:
+        model (torch.nn.Module): Trained model to export.
+        save_path (str): Output path (conventionally ending in `.pt`).
+    """
+    model.eval()
+    scripted = torch.jit.script(model)
+    torch.jit.save(scripted, save_path)
+    return scripted

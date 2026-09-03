@@ -13,7 +13,7 @@ import torchvision.transforms.functional as TF
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
-from model_factory import build_model, load_model
+from model_factory import build_model, load_model, save_torchscript
 from regression_model import *
 from two_branch_regression import *
 
@@ -659,6 +659,12 @@ if __name__ == "__main__":
                                    f"crosstalk_regression_model_trained_{current_time}_{batch_size}_{learning_rate}.pth")
     torch.save(model.state_dict(), model_save_path)
     print(f"Trained model weights saved to {model_save_path}")
+
+    # Export a self-contained TorchScript artifact for downstream consumers
+    script_path = os.path.join(output_dir_name,
+                               f"crosstalk_regression_model_trained_{current_time}_{batch_size}_{learning_rate}.pt")
+    save_torchscript(model, script_path)
+    print(f"TorchScript model saved to {script_path}")
 
     # --- Plot Training and Validation Losses ---
     plt.figure(figsize=(10, 6))
