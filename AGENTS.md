@@ -152,6 +152,23 @@ object, and the later `scheduler.step()` call will crash with an
 - Filenames are the source of truth for labels and pairing — never assume a
   separate manifest exists.
 
+## Downstream consumers of the model checkpoint
+
+The trained checkpoint `crosstalk_regression_model_trained_*.pth` is a **shared
+contract** with other Crick projects, notably
+`github.com/FrancisCrickInstitute/py-bioimage-qc`. That repo does *not* import
+this code — it vendors its own `regression_model.py` (class renamed to
+`CrossTalkRegressionModel`) and loads the same `.pth` inline with hardcoded
+constructor args `initial_filters=128, num_conv_blocks=6`.
+
+Consequences:
+
+- The `.pth` state_dict, the constructor args, and the `single` architecture must
+  stay compatible. Changing `SINGLE_MODEL_KWARGS`, layer counts, or the class
+  name will silently break the downstream loader (which can't see our factory).
+- Do not assume renaming files here (e.g. `regression_model.py`) is safe; the
+  downstream repo has its own copy and matches only by checkpoint contract.
+
 ## Data Layout
 
 - `Training_Data/Mixed/` and `Training_Data/Source/` — paired `.tif` images
