@@ -22,9 +22,8 @@ Two (currently divergent) environment definitions exist:
 - **`requirements.txt`** — README still documents a `conda` + `pip install -r`
   workflow with `python=3.13`.
 
-Note the mismatch: `pixi.toml` pins `python >=3.14.7,<3.15`, while the README
-says `python=3.13`. If you touch either file, keep them in sync or flag the
-discrepancy.
+Note the mismatch is now resolved: `pixi.toml` pins `python = "3.13.*"`, matching
+the README/`requirements.txt` (`python=3.13`). Keep them in sync if either changes.
 
 `requirements.txt` lists **fewer** packages than the code actually imports. The
 test script additionally needs `scipy`, `scikit-image`, `scikit-learn`
@@ -181,11 +180,12 @@ re-instantiating the architecture).
 `train_model.py` now writes both the `.pth` (state_dict, for resume/reload) and
 a `.pt` (TorchScript, for external consumers) alongside each other.
 
-Gothca: `torch.jit.script` emits a `FutureWarning` on Python 3.14+ and upstream
-recommends `torch.export` as the replacement, but `torch.export` shape-specializes
-its input (batch becomes fixed at export time) and rejects other batch sizes.
-For this PyTorch-only, dynamic-batch use case, TorchScript still works and is
-the pragmatic choice. Revisit if a future PyTorch removes `torch.jit`.
+Gothca: `torch.jit.script` is deprecated in torch 2.14+ (emits a `FutureWarning`
+on *all* Python versions, not just 3.14), and upstream recommends `torch.export`
+as the replacement. However, `torch.export` shape-specializes its input (batch
+becomes fixed at export time) and rejects other batch sizes. For this
+PyTorch-only, dynamic-batch use case, TorchScript still works and is the
+pragmatic choice. Revisit if a future PyTorch removes `torch.jit`.
 
 ## Data Layout
 
@@ -208,7 +208,8 @@ the pragmatic choice. Revisit if a future PyTorch removes `torch.jit`.
 4. `cosine_warmup` scheduler is broken (missing `custom_warmup` branch).
 5. `requirements.txt` omits `scipy`, `scikit-image`, `scikit-learn`, `pandas`
    that the scripts import.
-6. `pixi.toml` (Python 3.14) vs README/`requirements.txt` (Python 3.13) disagree.
+6. `requirements.txt` omits `scipy`, `scikit-image`, `scikit-learn`, `pandas`
+   that the scripts import.
 7. Default CLI paths point at NEMO/Linux HPC mounts, not local Windows paths.
 8. Image size is hardcoded to 256×256 (`TARGET_IMAGE_SIZE`, and
    `_get_conv_output((256,256))`).
