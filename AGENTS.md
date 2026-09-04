@@ -25,12 +25,12 @@ Two (currently divergent) environment definitions exist:
 Note the mismatch is now resolved: `pixi.toml` pins `python = "3.13.*"`, matching
 the README/`requirements.txt` (`python=3.13`). Keep them in sync if either changes.
 
-`requirements.txt` lists **fewer** packages than the code actually imports. The
-test script needs `scipy`, `scikit-image`, `scikit-learn` (`pearsonr`, `ssim`,
-`normalized_mutual_info_score`); `analyse_training_results.py` and
-`examine_large_errors.py` need `pandas`; and `examine_large_errors.py` also needs
-`requests` and `zarr` (with `fsspec[http]`, which is already listed). None of
-these are declared in `pixi.toml` or `requirements.txt`.
+`requirements.txt` lists **fewer** packages than the code actually imports. As of
+the latest `pixi.toml`, `pandas`, `requests`, and `zarr` are now declared, but the
+following are **still missing** from both `pixi.toml` and `requirements.txt`:
+
+- `scipy`, `scikit-image`, `scikit-learn` — needed by `test-cross-talk-model.py`
+  (`pearsonr`, `ssim`, `normalized_mutual_info_score`).
 
 The repo is Windows-targeted (`platforms = ["win-64"]`), but default CLI paths
 in the scripts point at Linux/NEMO HPC mounts (`/nemo/...`, `Z:/working/...`),
@@ -260,17 +260,15 @@ by running the relevant script.
 6. **Hardcoded 256×256 input**: `TARGET_IMAGE_SIZE` is defined but not applied
    as a resize; the models assume 256×256 via `_get_conv_output((256,256))` and
    the two-branch dummy input. Non-256 inputs break the FC layer.
-7. **Missing declared dependencies**: `scipy`, `scikit-image`, `scikit-learn`
-   (used in `test-cross-talk-model.py`), `pandas` (used in
-   `analyse_training_results.py` and `examine_large_errors.py`), and `requests` +
-   `zarr` (used in `examine_large_errors.py`) are absent from `pixi.toml` and
-   `requirements.txt`.
+7. **Missing declared dependencies** (`test-cross-talk-model.py`): `scipy`,
+   `scikit-image`, `scikit-learn` are absent from `pixi.toml` and
+   `requirements.txt`. (`pandas`, `requests`, `zarr` are now declared.)
 8. **Hardcoded paths**: `analyse_training_results.py` (`base_directory`) and
    `examine_large_errors.py` (`--csv_file` default) both point at
    `Z:/working/barryd/hpc/python/Torch-Unet`; neither is CLI-driven for its base
    path.
 9. **Dead code in `evaluate_and_save`** (`train_model.py` version): an unused
    `csv.writer` and `fieldnames` local precede the `DictWriter` call.
-10. **`examine_large_errors.py` not yet validated end-to-end**: requires
-    `requests` and `zarr` (not currently installed in the `crosstalk` env) and
-    network access to IDR; has not been run in this repo.
+10. **`examine_large_errors.py` not yet validated end-to-end**: deps (`requests`,
+    `zarr`, `pandas`) are now installed, but it still requires network access to
+    IDR and has not been run in this repo.
