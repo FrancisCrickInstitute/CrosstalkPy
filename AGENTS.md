@@ -26,9 +26,11 @@ Note the mismatch is now resolved: `pixi.toml` pins `python = "3.13.*"`, matchin
 the README/`requirements.txt` (`python=3.13`). Keep them in sync if either changes.
 
 `requirements.txt` lists **fewer** packages than the code actually imports. The
-test script additionally needs `scipy`, `scikit-image`, `scikit-learn`
-(`pearsonr`, `ssim`, `normalized_mutual_info_score`), and `analyse_training_results.py`
-needs `pandas`. None of these are declared anywhere.
+test script needs `scipy`, `scikit-image`, `scikit-learn` (`pearsonr`, `ssim`,
+`normalized_mutual_info_score`); `analyse_training_results.py` and
+`examine_large_errors.py` need `pandas`; and `examine_large_errors.py` also needs
+`requests` and `zarr` (with `fsspec[http]`, which is already listed). None of
+these are declared in `pixi.toml` or `requirements.txt`.
 
 The repo is Windows-targeted (`platforms = ["win-64"]`), but default CLI paths
 in the scripts point at Linux/NEMO HPC mounts (`/nemo/...`, `Z:/working/...`),
@@ -37,7 +39,7 @@ so running on this machine needs explicit `-m`/`-s` args.
 ## Commands
 
 There is **no test suite, linter, formatter, or CI**. The only entry points are
-three standalone scripts run via `python`:
+four standalone scripts run via `python`:
 
 ```bash
 # Train (defaults point at ./Training_Data/Mixed and ./Training_Data/Source)
@@ -50,6 +52,9 @@ python test-cross-talk-model.py -m <mixed_dir> -s <source_dir> \
 
 # Ad-hoc analysis script (hardcoded base dir at top of main(); not CLI-driven)
 python analyse_training_results.py
+
+# Download top-N worst predictions from IDR (reads an eval CSV; see below)
+python examine_large_errors.py --csv_file <test_predictions_*.csv> --top-n 20
 ```
 
 Key CLI args (see `argparse` in `train_model.py` and `test-cross-talk-model.py`):
@@ -126,14 +131,33 @@ Produces `eval_run_<ts>/` with `params.txt`, `model_architecture.txt`, and a
 (RMSE, SSIM, histogram correlation, NMI, Pearson) computed between the two input
 channels, plus a scatter plot per metric.
 
-### Scheduler naming pitfall
+### Scheduler naming pitfall (resolved)
 
-`scheduler_configs` has a key `cosine_warmup` whose `type` is actually
-`'custom_warmup'`, but the scheduler-instantiation `if/elif` chain only handles
-`'plateau'`, `'onecycle'`, and `'cosine'` — there is **no branch for
-`'custom_warmup'`**. Selecting `-r cosine_warmup` therefore creates no scheduler
-object, and the later `scheduler.step()` call will crash with an
-`UnboundLocalError`. `cosine_warmup` is effectively broken as wired.
+`scheduler_configs` has a key `cosine_warmup` whose `type` is the literal
+`'custom_warmup'`. The instantiation `if/elif` chain must include a
+`'custom_warmup'` branch (it now does — a warmup + cosine `LambdaLR`), and the
+per-epoch stepping chain lists both `'cosine'` and `'custom_warmup'`. If either
+chain ever drops `'custom_warmup'`, `-r cosine_warmup` will crash with an
+`UnboundLocalError` on the first `scheduler.step()`.
+
+### Error-analysis pipeline (`examine_large_errors.py`)
+
+Reads an eval CSV (the `test_predictions_<ts>.csv` written by
+`test-cross-talk-model.py`), computes `abs(Actual_Label - Predicted_Label)`,
+ranks the worst `--top-n`, fetches per-image metadata from the IDR REST API, and
+downloads the original images from IDR's public OME-Zarr stores (`zarr` +
+`fsspec[http]`, no auth).
+
+Gotchas:
+
+- It requires an `Image_ID` column, which **only** `test-cross-talk-model.py`
+  writes. `train_model.py`'s `evaluate_and_save` does NOT emit `Image_ID`, so its
+  prediction CSVs can't be fed here.
+- The `Image_ID` is the IDR image id (the `image_<id>_alpha_<value>_*.tif` id),
+  used directly as the IDR API key — not a local file index.
+- Default `--csv_file` points at a NEMO/HPC path (`Z:/working/...`); override
+  locally.
+- It adds deps `requests` and `zarr` (plus the already-listed `fsspec`, `pandas`).
 
 ## Conventions & Style
 
@@ -237,10 +261,16 @@ by running the relevant script.
    as a resize; the models assume 256×256 via `_get_conv_output((256,256))` and
    the two-branch dummy input. Non-256 inputs break the FC layer.
 7. **Missing declared dependencies**: `scipy`, `scikit-image`, `scikit-learn`
-   (used in `test-cross-talk-model.py`) and `pandas` (used in
-   `analyse_training_results.py`) are absent from `pixi.toml` and
+   (used in `test-cross-talk-model.py`), `pandas` (used in
+   `analyse_training_results.py` and `examine_large_errors.py`), and `requests` +
+   `zarr` (used in `examine_large_errors.py`) are absent from `pixi.toml` and
    `requirements.txt`.
-8. **`analyse_training_results.py` hardcoded path**: `base_directory` points at
-   `Z:/working/barryd/hpc/python/Torch-Unet`; not CLI-driven.
+8. **Hardcoded paths**: `analyse_training_results.py` (`base_directory`) and
+   `examine_large_errors.py` (`--csv_file` default) both point at
+   `Z:/working/barryd/hpc/python/Torch-Unet`; neither is CLI-driven for its base
+   path.
 9. **Dead code in `evaluate_and_save`** (`train_model.py` version): an unused
    `csv.writer` and `fieldnames` local precede the `DictWriter` call.
+10. **`examine_large_errors.py` not yet validated end-to-end**: requires
+    `requests` and `zarr` (not currently installed in the `crosstalk` env) and
+    network access to IDR; has not been run in this repo.
