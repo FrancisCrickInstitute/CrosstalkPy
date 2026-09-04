@@ -202,14 +202,45 @@ pragmatic choice. Revisit if a future PyTorch removes `torch.jit`.
 ## Gotchas Summary
 
 1. No tests/CI; validate changes by actually running a short training or eval.
-2. `-o` model choice + constructor args must match the `.pth` being loaded.
+2. `.pth` files store only `state_dict`; the `-o` choice + constructor args in
+   `model_factory.py` must match the checkpoint being loaded.
 3. `CrosstalkDataset` and helpers are duplicated across `train_model.py` and
    `test-cross-talk-model.py` — keep in sync manually.
-4. `cosine_warmup` scheduler is broken (missing `custom_warmup` branch).
-5. `requirements.txt` omits `scipy`, `scikit-image`, `scikit-learn`, `pandas`
-   that the scripts import.
-6. `requirements.txt` omits `scipy`, `scikit-image`, `scikit-learn`, `pandas`
-   that the scripts import.
-7. Default CLI paths point at NEMO/Linux HPC mounts, not local Windows paths.
-8. Image size is hardcoded to 256×256 (`TARGET_IMAGE_SIZE`, and
+4. Default CLI paths point at NEMO/Linux HPC mounts, not local Windows paths.
+5. Image size is hardcoded to 256×256 (`TARGET_IMAGE_SIZE`, and
    `_get_conv_output((256,256))`).
+
+## Known Issues / To-Do
+
+Prioritized in rough order of impact. No test suite exists, so verify each fix
+by running the relevant script.
+
+1. **Split-ratio validation bug** (`train_model.py`, `main()`): the guard
+   `if not (abs(train_ratio + val_ratio) < 1.0)` is inverted nonsense — it warns
+   when ratios sum to 1.0 and never rejects `train_ratio + val_ratio >= 1.0`,
+   which yields an empty/negative test split. Should validate the sums are in
+   `(0, 1]`.
+2. **`l2_regularization` is dead code** (`train_model.py`): defined but never
+   called; regularizer is actually `weight_decay=1e-4` in the Adam optimizer.
+   Remove or wire it up.
+3. **`drop_last=True` silently drops samples**: all three `DataLoader`s (train/
+   val/test) drop the final partial batch, but loss is normalized by
+   `len(dataloader.dataset)`, so reported losses undercount on small datasets.
+   Decide intended behavior.
+4. **Remaining code duplication**: `CrosstalkDataset`, `normalize_image`,
+   `val_test_transforms_fn`, `evaluate_and_save` are copy-pasted between
+   `train_model.py` and `test-cross-talk-model.py` (model instantiation is
+   already centralized in `model_factory.py`). Extract shared modules.
+5. **Star imports** (`from regression_model import *`, `from two_branch_regression import *`)
+   — fragile; replace with explicit imports.
+6. **Hardcoded 256×256 input**: `TARGET_IMAGE_SIZE` is defined but not applied
+   as a resize; the models assume 256×256 via `_get_conv_output((256,256))` and
+   the two-branch dummy input. Non-256 inputs break the FC layer.
+7. **Missing declared dependencies**: `scipy`, `scikit-image`, `scikit-learn`
+   (used in `test-cross-talk-model.py`) and `pandas` (used in
+   `analyse_training_results.py`) are absent from `pixi.toml` and
+   `requirements.txt`.
+8. **`analyse_training_results.py` hardcoded path**: `base_directory` points at
+   `Z:/working/barryd/hpc/python/Torch-Unet`; not CLI-driven.
+9. **Dead code in `evaluate_and_save`** (`train_model.py` version): an unused
+   `csv.writer` and `fieldnames` local precede the `DictWriter` call.
