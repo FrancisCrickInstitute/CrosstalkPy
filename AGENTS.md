@@ -238,6 +238,31 @@ for the consumer. Recommendations:
    "mixed", channel 1 = "source") and a scalar `alpha` output. This is the only
    thing the consumer actually depends on once the `.pt` is used.
 
+### Distribution work plan (TODO — not yet implemented)
+
+Code changes targeted to make the above real:
+
+1. Add a `MODEL_VERSION` constant in `model_factory.py` and version-encode the
+   exported `.pt`/`.pth` filenames.
+2. On export, write a `model_manifest.json` (per training run) with version,
+   filenames, SHA256 hashes, input/output contract, and the model kwargs used.
+3. Refactor `save_torchscript` to record version and return/verify a SHA256;
+   add a `write_manifest` helper to `model_factory.py`.
+4. Add a `load_torchscript(path, device)` helper for first-class consumer-facing
+   loading (and to dog-food our own `.pt`).
+5. Copy the `.pt` + manifest to a stable `releases/` dir for handoff (see open
+   question below).
+
+Open questions to settle before editing (current leanings in parens):
+
+- Versioning scheme: semantic `MODEL_VERSION` constant (leaning) vs. reuse the
+  timestamp in the filename.
+- Manifest scope: per-run manifest + a root `LATEST` pointer (leaning) vs. a
+  single tracked "current release" manifest.
+- Packaging output: write to `training_run_*` only, or also copy to `releases/`
+  (leaning: also copy to `releases/`).
+- Initial scope: full items 1–5 now, or minimal subset first.
+
 ## Data Layout
 
 - `Training_Data/Mixed/` and `Training_Data/Source/` — paired `.tif` images
