@@ -211,6 +211,33 @@ becomes fixed at export time) and rejects other batch sizes. For this
 PyTorch-only, dynamic-batch use case, TorchScript still works and is the
 pragmatic choice. Revisit if a future PyTorch removes `torch.jit`.
 
+## Weights distribution for pip-installable consumers
+
+`py-bioimage-qc` is becoming a pip-installable package and will consume the
+trained checkpoint. That raises packaging questions that this repo must answer
+for the consumer. Recommendations:
+
+1. **Hand off the TorchScript `.pt`, not the raw `.pth`.** The `.pt` bundles
+   architecture + weights, keeps batch size dynamic, and loads via
+   `torch.jit.load()` with no class definition or constructor args. That removes
+   the consumer's need to vendor a matching `regression_model.py` and the
+   hard-coded `initial_filters=128, num_conv_blocks=6` contract. Ensure
+   `model_factory.save_torchscript()` is always run (and its output versioned)
+   alongside `.pth` export.
+2. **Do not bundle weights inside the wheel.** Model files are large, are data
+   (not code), and bloat the package + install. Distribute weights through a
+   separate artifact channel: GitHub Releases, an internal object store/S3
+   bucket, or a host like IDR. The consumer downloads on first use and caches to
+   a user data dir (e.g. `platformdirs`, `~/.cache`) — never into the package
+   install directory.
+3. **Version the weights explicitly.** The current filename encodes train
+   date/lr/size, but a released pip package must pin or request a specific
+   weight version so a regenerated model never changes results silently. Publish
+   a version + URL + SHA256 that the consumer fetches and verifies.
+4. **Document the public input/output contract.** 2×256×256 input (channel 0 =
+   "mixed", channel 1 = "source") and a scalar `alpha` output. This is the only
+   thing the consumer actually depends on once the `.pt` is used.
+
 ## Data Layout
 
 - `Training_Data/Mixed/` and `Training_Data/Source/` — paired `.tif` images
@@ -269,6 +296,9 @@ by running the relevant script.
    path.
 9. **Dead code in `evaluate_and_save`** (`train_model.py` version): an unused
    `csv.writer` and `fieldnames` local precede the `DictWriter` call.
-10. **`examine_large_errors.py` not yet validated end-to-end**: deps (`requests`,
+10. **Weights not yet versioned/released for pip consumers**: see "Weights
+    distribution for pip-installable consumers" above. No version + URL + SHA256
+    artifact exists yet for the consumer to fetch/verify.
+11. **`examine_large_errors.py` not yet validated end-to-end**: deps (`requests`,
     `zarr`, `pandas`) are now installed, but it still requires network access to
     IDR and has not been run in this repo.
