@@ -253,16 +253,16 @@ Code changes landed to make the above real:
    (dog-foods our own `.pt`; verified dynamic batch).
 5. Export step copies the `.pt` + manifest to `releases/v<version>/` for
    handoff.
+6. Export step writes `releases/LATEST` (JSON with `version` + relative
+   `manifest` path) so consumers can resolve the current artifacts without
+   parsing timestamps.
 
 Open questions resolved:
 
 - Versioning: semantic `MODEL_VERSION` constant (chosen).
-- Manifest scope: per-run manifest; a root `LATEST` pointer is still TODO.
+- Manifest scope: per-run manifest + a root `LATEST` pointer (chosen).
 - Packaging output: also copy to `releases/` (chosen).
-- Scope: full items 1–5 done.
-
-Remaining TODO: a root `releases/LATEST` pointer (manifest filename indirection)
-so consumers can fetch "latest" without parsing timestamps.
+- Scope: full items 1–5 done (plus the `LATEST` pointer).
 
 ## Data Layout
 
@@ -323,9 +323,9 @@ by running the relevant script.
 9. **Dead code in `evaluate_and_save`** (`train_model.py` version): an unused
    `csv.writer` and `fieldnames` local precede the `DictWriter` call.
 10. **Weights versioning/release partially done**: `MODEL_VERSION`, per-run
-    manifest with SHA256, `load_torchscript`, and `releases/v<version>/` copies
-    are implemented (see "Distribution implementation" above). Still TODO: a
-    `releases/LATEST` pointer and publishing the artifacts (URL) for the
+    manifest with SHA256, `load_torchscript`, `releases/v<version>/` copies, and
+    a `releases/LATEST` pointer are implemented (see "Distribution
+    implementation" above). Still TODO: publishing the artifacts (URL) for the
     consumer to fetch/verify.
 11. **`examine_large_errors.py` not yet validated end-to-end**: deps (`requests`,
     `zarr`, `pandas`) are now installed, but it still requires network access to
