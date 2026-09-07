@@ -1,6 +1,7 @@
 import argparse
 import csv
 import datetime
+import json
 import os
 import re  # Import regex for pattern matching
 import shutil
@@ -699,6 +700,21 @@ if __name__ == "__main__":
         dst = os.path.join(releases_dir, os.path.basename(src))
         shutil.copy2(src, dst)
         print(f"Copied {os.path.basename(src)} to {dst}")
+
+    # Point `releases/LATEST` at the manifest for this run so consumers can
+    # resolve the current artifacts without parsing timestamps.
+    latest_path = os.path.join("releases", "LATEST")
+    with open(latest_path, "w") as f:
+        json.dump(
+            {
+                "version": MODEL_VERSION,
+                "manifest": os.path.join(f"v{MODEL_VERSION}", os.path.basename(manifest_path)),
+            },
+            f,
+            indent=2,
+        )
+        f.write("\n")
+    print(f"LATEST pointer written to {latest_path}")
 
     # --- Plot Training and Validation Losses ---
     plt.figure(figsize=(10, 6))
