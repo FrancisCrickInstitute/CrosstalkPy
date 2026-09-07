@@ -90,7 +90,24 @@ def save_torchscript(model, save_path, example_input=None):
     return scripted
 
 
-def hash_file(path):
+def load_torchscript(model_path, device):
+    """Load a self-contained TorchScript artifact for inference.
+
+    Unlike `load_model`, this needs no model class or constructor args: the
+    architecture is bundled inside the `.pt` file. This is the loader a
+    downstream consumer should use.
+
+    Args:
+        model_path (str): Path to the `.pt` file written by `save_torchscript`.
+        device (torch.device): Device to run the model on.
+
+    Returns:
+        torch.jit.ScriptModule: Loaded model in eval mode on the given device.
+    """
+    model = torch.jit.load(model_path, map_location=device)
+    model.eval()
+    model.to(device)
+    return model
     """Return the hex SHA256 digest of a file on disk."""
     h = hashlib.sha256()
     with open(path, "rb") as f:
