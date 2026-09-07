@@ -10,6 +10,11 @@ from two_branch_regression import SimplifiedTwoBranchRegressionModel
 SINGLE_MODEL_KWARGS = {"initial_filters": 128, "num_conv_blocks": 6}
 DOUBLE_MODEL_KWARGS = {"initial_filters_per_branch": 64}
 
+# Semantic version of the exported model artifacts. Bump whenever the weights
+# or the input/output contract change, so pip-installable consumers can pin or
+# request a specific version instead of relying on the timestamp in the filename.
+MODEL_VERSION = "1.0.0"
+
 
 def build_model(model_selection):
     """Instantiate the model matching the requested architecture.
