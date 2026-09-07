@@ -238,30 +238,31 @@ for the consumer. Recommendations:
    "mixed", channel 1 = "source") and a scalar `alpha` output. This is the only
    thing the consumer actually depends on once the `.pt` is used.
 
-### Distribution work plan (TODO — not yet implemented)
+### Distribution implementation (done)
 
-Code changes targeted to make the above real:
+Code changes landed to make the above real:
 
-1. Add a `MODEL_VERSION` constant in `model_factory.py` and version-encode the
-   exported `.pt`/`.pth` filenames.
-2. On export, write a `model_manifest.json` (per training run) with version,
-   filenames, SHA256 hashes, input/output contract, and the model kwargs used.
-3. Refactor `save_torchscript` to record version and return/verify a SHA256;
-   add a `write_manifest` helper to `model_factory.py`.
-4. Add a `load_torchscript(path, device)` helper for first-class consumer-facing
-   loading (and to dog-food our own `.pt`).
-5. Copy the `.pt` + manifest to a stable `releases/` dir for handoff (see open
-   question below).
+1. `model_factory.py` defines `MODEL_VERSION = "1.0.0"` (semantic version),
+   export filenames are version-encoded (`..._v1.0.0_...`).
+2. `train_model.py` writes a `model_manifest_v<ver>_<ts>.json` per run with
+   version, `model_selection`, `model_kwargs`, the input/output contract, and
+   per-artifact `sha256` digests (via `model_factory.hash_file` /
+   `write_manifest`).
+3. `save_torchscript` + `write_manifest` live in `model_factory.py` for reuse.
+4. `load_torchscript(path, device)` helper added for consumer-facing load
+   (dog-foods our own `.pt`; verified dynamic batch).
+5. Export step copies the `.pt` + manifest to `releases/v<version>/` for
+   handoff.
 
-Open questions to settle before editing (current leanings in parens):
+Open questions resolved:
 
-- Versioning scheme: semantic `MODEL_VERSION` constant (leaning) vs. reuse the
-  timestamp in the filename.
-- Manifest scope: per-run manifest + a root `LATEST` pointer (leaning) vs. a
-  single tracked "current release" manifest.
-- Packaging output: write to `training_run_*` only, or also copy to `releases/`
-  (leaning: also copy to `releases/`).
-- Initial scope: full items 1–5 now, or minimal subset first.
+- Versioning: semantic `MODEL_VERSION` constant (chosen).
+- Manifest scope: per-run manifest; a root `LATEST` pointer is still TODO.
+- Packaging output: also copy to `releases/` (chosen).
+- Scope: full items 1–5 done.
+
+Remaining TODO: a root `releases/LATEST` pointer (manifest filename indirection)
+so consumers can fetch "latest" without parsing timestamps.
 
 ## Data Layout
 
@@ -321,9 +322,11 @@ by running the relevant script.
    path.
 9. **Dead code in `evaluate_and_save`** (`train_model.py` version): an unused
    `csv.writer` and `fieldnames` local precede the `DictWriter` call.
-10. **Weights not yet versioned/released for pip consumers**: see "Weights
-    distribution for pip-installable consumers" above. No version + URL + SHA256
-    artifact exists yet for the consumer to fetch/verify.
+10. **Weights versioning/release partially done**: `MODEL_VERSION`, per-run
+    manifest with SHA256, `load_torchscript`, and `releases/v<version>/` copies
+    are implemented (see "Distribution implementation" above). Still TODO: a
+    `releases/LATEST` pointer and publishing the artifacts (URL) for the
+    consumer to fetch/verify.
 11. **`examine_large_errors.py` not yet validated end-to-end**: deps (`requests`,
     `zarr`, `pandas`) are now installed, but it still requires network access to
     IDR and has not been run in this repo.
