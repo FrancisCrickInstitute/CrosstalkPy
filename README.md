@@ -89,3 +89,42 @@ A number of options can be specified to control the training process:
   -r, --learning_scheduler {aggressive_plateau,onecycle,cosine_warmup}
                         Use aggressive_plateau, onecycle or cosine_warmup learning scheduler
 ```
+
+## Model Distribution
+
+Training exports both the raw weights and a self-contained TorchScript artifact,
+plus a manifest, into the training run directory:
+
+- `crosstalk_regression_model_v<version>_<timestamp>_<bs>_<lr>.pth` — raw
+  `state_dict` weights (for resuming/reloading within this repo).
+- `crosstalk_regression_model_v<version>_<timestamp>_<bs>_<lr>.pt` — a
+  TorchScript bundle containing both the architecture **and** the weights. This
+  is the recommended artifact to hand to other projects (for example,
+  `py-bioimage-qc`): it loads with `torch.jit.load()` and needs no knowledge of
+  the model class or its constructor arguments.
+- `model_manifest_v<version>_<timestamp>.json` — the model version, the input/
+  output contract (a 2×256×256 input where channel 0 is the "mixed" image and
+  channel 1 is the "source" image, and a scalar `alpha` output in `[0, 1]`), and
+  a SHA256 digest of each artifact for download verification.
+
+For convenience, the `.pt` and manifest are also copied to
+`releases/v<version>/`, and `releases/LATEST` points at the current manifest so
+consumers can resolve the latest artifacts without parsing timestamps.
+
+### Loading the exported model
+
+A downstream project can load the `.pt` directly, without importing any of this
+repo's code:
+
+```python
+import torch
+
+model = torch.jit.load("path/to/crosstalk_regression_model_v1.0.0_...pt")
+model.eval()
+
+# Input: [batch, 2, 256, 256] tensor, channel 0 = mixed, channel 1 = source.
+# Output: [batch, 1] scalar crosstalk alpha in [0, 1].
+with torch.no_grad():
+    alpha = model(input_tensor)
+```
+
