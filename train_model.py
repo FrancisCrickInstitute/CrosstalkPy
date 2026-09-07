@@ -13,7 +13,15 @@ import torchvision.transforms.functional as TF
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
-from model_factory import MODEL_VERSION, build_model, load_model, save_torchscript
+from model_factory import (
+    DOUBLE_MODEL_KWARGS,
+    MODEL_VERSION,
+    SINGLE_MODEL_KWARGS,
+    build_model,
+    load_model,
+    save_torchscript,
+    write_manifest,
+)
 from regression_model import *
 from two_branch_regression import *
 
@@ -665,6 +673,23 @@ if __name__ == "__main__":
                                f"crosstalk_regression_model_v{MODEL_VERSION}_{current_time}_{batch_size}_{learning_rate}.pt")
     save_torchscript(model, script_path)
     print(f"TorchScript model saved to {script_path}")
+
+    # Write a manifest with version, SHA256, and the input/output contract
+    manifest_path = os.path.join(
+        output_dir_name,
+        f"model_manifest_v{MODEL_VERSION}_{current_time}.json",
+    )
+    model_kwargs = SINGLE_MODEL_KWARGS if model_selection == "single" else DOUBLE_MODEL_KWARGS
+    write_manifest(
+        manifest_path,
+        {
+            "pth": os.path.basename(model_save_path),
+            "pt": os.path.basename(script_path),
+        },
+        model_selection,
+        model_kwargs,
+    )
+    print(f"Model manifest saved to {manifest_path}")
 
     # --- Plot Training and Validation Losses ---
     plt.figure(figsize=(10, 6))

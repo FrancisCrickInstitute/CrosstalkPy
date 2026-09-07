@@ -1,3 +1,7 @@
+import hashlib
+import json
+import os
+
 import torch
 
 from regression_model import AdvancedRegressionModel
@@ -84,3 +88,45 @@ def save_torchscript(model, save_path, example_input=None):
     scripted = torch.jit.script(model)
     torch.jit.save(scripted, save_path)
     return scripted
+
+
+def hash_file(path):
+    """Return the hex SHA256 digest of a file on disk."""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def write_manifest(manifest_path, artifact_files, model_selection, model_kwargs):
+    """Write a JSON manifest describing exported model artifacts.
+
+    Args:
+        manifest_path (str): Output path for the JSON manifest.
+        artifact_files (dict): Mapping of descriptor -> relative filename for
+            each artifact (e.g. {'pth': '...', 'pt': '...'}).
+        model_selection (str): 'single' or 'double'.
+        model_kwargs (dict): Constructor args used to build the model.
+    """
+    entries = {}
+    for key, filename in artifact_files.items():
+        full_path = os.path.join(os.path.dirname(manifest_path), filename)
+        entries[key] = {"file": filename, "sha256": hash_file(full_path)}
+
+    manifest = {
+        "version": MODEL_VERSION,
+        "model_selection": model_selection,
+        "model_kwargs": model_kwargs,
+        "input": {
+            "channels": 2,
+            "height": 256,
+            "width": 256,
+            "channel_order": ["mixed", "source"],
+        },
+        "output": {"type": "scalar", "description": "crosstalk alpha in [0, 1]"},
+        "artifacts": entries,
+    }
+    with open(manifest_path, "w") as f:
+        json.dump(manifest, f, indent=2)
+        f.write("\n")
