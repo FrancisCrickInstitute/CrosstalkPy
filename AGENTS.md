@@ -330,3 +330,11 @@ by running the relevant script.
 11. **`examine_large_errors.py` not yet validated end-to-end**: deps (`requests`,
     `zarr`, `pandas`) are now installed, but it still requires network access to
     IDR and has not been run in this repo.
+12. **README needs a post-retrain update** (not yet done — pending a full model
+    re-run): once a new checkpoint is trained and exported, update the
+    `test-cross-talk-model.py` `-p` suggestion in the README's Evaluation section
+    (currently points at the old
+    `crosstalk_regression_model_trained_2025-12-15_18-22-01_256_0.0005.pth`)
+    and/or commit the new `releases/` artifacts + `LATEST` pointer. Also confirm
+    the README's `conda`-based setup stays consistent with whichever package
+    manager (`pixi.toml` vs `requirements.txt`) is canonical.
