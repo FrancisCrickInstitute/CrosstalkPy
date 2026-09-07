@@ -3,6 +3,7 @@ import csv
 import datetime
 import os
 import re  # Import regex for pattern matching
+import shutil
 from datetime import datetime
 
 import imageio.v3 as iio
@@ -690,6 +691,14 @@ if __name__ == "__main__":
         model_kwargs,
     )
     print(f"Model manifest saved to {manifest_path}")
+
+    # Copy the self-contained artifact + manifest to a stable handoff dir
+    releases_dir = os.path.join("releases", f"v{MODEL_VERSION}")
+    os.makedirs(releases_dir, exist_ok=True)
+    for src in (script_path, manifest_path):
+        dst = os.path.join(releases_dir, os.path.basename(src))
+        shutil.copy2(src, dst)
+        print(f"Copied {os.path.basename(src)} to {dst}")
 
     # --- Plot Training and Validation Losses ---
     plt.figure(figsize=(10, 6))
