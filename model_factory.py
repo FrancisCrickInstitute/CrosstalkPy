@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 
+import numpy as np
 import torch
 
 from regression_model import AdvancedRegressionModel
@@ -119,7 +120,44 @@ def hash_file(path):
     return h.hexdigest()
 
 
-def write_manifest(manifest_path, artifact_files, model_selection, model_kwargs):
+def build_sample_tensors(model, output_dir, seed=0, batch_size=1):
+    """Generate deterministic example input/output tensors for the model.
+
+    Produces a `sample_input.npy` (shape `[batch, 2, 256, 256]`, float32) and the
+    corresponding `sample_output.npy` (shape `[batch, 1]`) by running `model` in
+    eval mode. These act as a self-verifying input/output contract: a downstream
+    consumer can load the model, feed `sample_input.npy`, and confirm the output
+    matches `sample_output.npy` within tolerance.
+
+    Args:
+        model (torch.nn.Module): Trained model in eval mode.
+        output_dir (str): Directory to write the `.npy` files into.
+        seed (int): RNG seed for reproducibility.
+        batch_size (int): Number of examples in the sample batch.
+
+    Returns:
+        dict mapping descriptor ('input', 'output') to the relative filename of
+        each saved tensor.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    rng = np.random.default_rng(seed)
+    # Values are pre-normalization floats in a realistic [0, 1] range; consumers
+    # should treat the input as already-normalized (see normalize_image).
+    sample_input = rng.random((batch_size, 2, 256, 256), dtype=np.float32)
+
+    model.eval()
+    with torch.no_grad():
+        sample_output = model(torch.from_numpy(sample_input)).cpu().numpy()
+
+    input_path = os.path.join(output_dir, "sample_input.npy")
+    output_path = os.path.join(output_dir, "sample_output.npy")
+    np.save(input_path, sample_input)
+    np.save(output_path, sample_output)
+    return {"input": "sample_input.npy", "output": "sample_output.npy"}
+
+
+def write_manifest(manifest_path, artifact_files, model_selection, model_kwargs,
+                   sample_tensors=None):
     """Write a JSON manifest describing exported model artifacts.
 
     Args:
@@ -128,10 +166,14 @@ def write_manifest(manifest_path, artifact_files, model_selection, model_kwargs)
             each artifact (e.g. {'pth': '...', 'pt': '...'}).
         model_selection (str): 'single' or 'double'.
         model_kwargs (dict): Constructor args used to build the model.
+        sample_tensors (dict, optional): Mapping of descriptor -> relative
+            filename for sample input/output tensors (from
+            `build_sample_tensors`). Recorded with SHA256 digests.
     """
+    base_dir = os.path.dirname(manifest_path)
     entries = {}
     for key, filename in artifact_files.items():
-        full_path = os.path.join(os.path.dirname(manifest_path), filename)
+        full_path = os.path.join(base_dir, filename)
         entries[key] = {"file": filename, "sha256": hash_file(full_path)}
 
     manifest = {
@@ -147,6 +189,13 @@ def write_manifest(manifest_path, artifact_files, model_selection, model_kwargs)
         "output": {"type": "scalar", "description": "crosstalk alpha in [0, 1]"},
         "artifacts": entries,
     }
+
+    if sample_tensors:
+        manifest["sample_tensors"] = {
+            key: {"file": filename, "sha256": hash_file(os.path.join(base_dir, filename))}
+            for key, filename in sample_tensors.items()
+        }
+
     with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2)
         f.write("\n")

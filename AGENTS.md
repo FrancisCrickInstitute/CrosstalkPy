@@ -247,7 +247,7 @@ Code changes landed to make the above real:
 2. `train_model.py` writes a `model_manifest_v<ver>_<ts>.json` per run with
    version, `model_selection`, `model_kwargs`, the input/output contract, and
    per-artifact `sha256` digests (via `model_factory.hash_file` /
-   `write_manifest`).
+   `write_manifest`), plus `sample_tensors` (see below).
 3. `save_torchscript` + `write_manifest` live in `model_factory.py` for reuse.
 4. `load_torchscript(path, device)` helper added for consumer-facing load
    (dog-foods our own `.pt`; verified dynamic batch).
@@ -256,6 +256,14 @@ Code changes landed to make the above real:
 6. Export step writes `releases/LATEST` (JSON with `version` + relative
    `manifest` path) so consumers can resolve the current artifacts without
    parsing timestamps.
+7. `build_sample_tensors(model, output_dir)` (in `model_factory.py`) emits a
+   deterministic `sample_input.npy` + `sample_output.npy` pair (the latter by
+   running the model), so a downstream consumer can self-verify loading by
+   feeding the input and comparing to the reference output. Both are SHA256-hashed
+   in the manifest under `sample_tensors` and copied to `releases/`.
+8. `CITATION.cff` at repo root provides machine-readable citation metadata
+   (author, title, `repository-code`). No `license` key yet — add one when a
+   LICENSE file is chosen.
 
 Open questions resolved:
 

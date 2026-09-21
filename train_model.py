@@ -20,6 +20,7 @@ from model_factory import (
     MODEL_VERSION,
     SINGLE_MODEL_KWARGS,
     build_model,
+    build_sample_tensors,
     load_model,
     save_torchscript,
     write_manifest,
@@ -682,6 +683,11 @@ if __name__ == "__main__":
         f"model_manifest_v{MODEL_VERSION}_{current_time}.json",
     )
     model_kwargs = SINGLE_MODEL_KWARGS if model_selection == "single" else DOUBLE_MODEL_KWARGS
+
+    # Generate deterministic sample input/output tensors so consumers can verify
+    # their own loading/inference against a known-good reference output.
+    sample_tensors = build_sample_tensors(model, output_dir_name)
+
     write_manifest(
         manifest_path,
         {
@@ -690,13 +696,16 @@ if __name__ == "__main__":
         },
         model_selection,
         model_kwargs,
+        sample_tensors=sample_tensors,
     )
     print(f"Model manifest saved to {manifest_path}")
 
     # Copy the self-contained artifact + manifest to a stable handoff dir
     releases_dir = os.path.join("releases", f"v{MODEL_VERSION}")
     os.makedirs(releases_dir, exist_ok=True)
-    for src in (script_path, manifest_path):
+    for src in (script_path, manifest_path, *[
+        os.path.join(output_dir_name, fn) for fn in sample_tensors.values()
+    ]):
         dst = os.path.join(releases_dir, os.path.basename(src))
         shutil.copy2(src, dst)
         print(f"Copied {os.path.basename(src)} to {dst}")
