@@ -300,14 +300,11 @@ Open questions resolved:
 Prioritized in rough order of impact. No test suite exists, so verify each fix
 by running the relevant script.
 
-1. **Split-ratio validation bug** (`train_model.py`, `main()`): the guard
-   `if not (abs(train_ratio + val_ratio) < 1.0)` is inverted nonsense — it warns
-   when ratios sum to 1.0 and never rejects `train_ratio + val_ratio >= 1.0`,
-   which yields an empty/negative test split. Should validate the sums are in
-   `(0, 1]`.
-2. **`l2_regularization` is dead code** (`train_model.py`): defined but never
-   called; regularizer is actually `weight_decay=1e-4` in the Adam optimizer.
-   Remove or wire it up.
+1. ~~**Split-ratio validation bug** (`train_model.py`, `main()`)~~ — fixed: the
+   guard now validates `0.0 < train_ratio + val_ratio <= 1.0` and raises
+   `ValueError` otherwise.
+2. ~~**`l2_regularization` is dead code** (`train_model.py`)~~ — removed
+   (regularizer is `weight_decay=1e-4` in the Adam optimizer).
 3. **`drop_last=True` silently drops samples**: all three `DataLoader`s (train/
    val/test) drop the final partial batch, but loss is normalized by
    `len(dataloader.dataset)`, so reported losses undercount on small datasets.
@@ -321,15 +318,15 @@ by running the relevant script.
 6. **Hardcoded 256×256 input**: `TARGET_IMAGE_SIZE` is defined but not applied
    as a resize; the models assume 256×256 via `_get_conv_output((256,256))` and
    the two-branch dummy input. Non-256 inputs break the FC layer.
-7. **Missing declared dependencies** (`test-cross-talk-model.py`): `scipy`,
-   `scikit-image`, `scikit-learn` are absent from `pixi.toml` and
-   `requirements.txt`. (`pandas`, `requests`, `zarr` are now declared.)
+7. ~~**Missing declared dependencies** (`test-cross-talk-model.py`)~~ — fixed:
+   `scipy`, `scikit-image`, `scikit-learn` are now declared in both `pixi.toml`
+   and `requirements.txt`.
 8. **Hardcoded paths**: `analyse_training_results.py` (`base_directory`) and
    `examine_large_errors.py` (`--csv_file` default) both point at
    `Z:/working/barryd/hpc/python/Torch-Unet`; neither is CLI-driven for its base
    path.
-9. **Dead code in `evaluate_and_save`** (`train_model.py` version): an unused
-   `csv.writer` and `fieldnames` local precede the `DictWriter` call.
+9. ~~**Dead code in `evaluate_and_save`** (`train_model.py` version)~~ — removed
+   the unused `csv.writer` and `fieldnames` local.
 10. **Weights versioning/release partially done**: `MODEL_VERSION`, per-run
     manifest with SHA256, `load_torchscript`, `releases/v<version>/` copies, and
     a `releases/LATEST` pointer are implemented (see "Distribution

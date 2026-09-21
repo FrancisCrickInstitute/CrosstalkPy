@@ -31,11 +31,6 @@ from two_branch_regression import *
 TARGET_IMAGE_SIZE = (256, 256)
 
 
-def l2_regularization(model, lambda_l2=1e-5):
-    l2_norm = sum(p.pow(2.0).sum() for p in model.parameters())
-    return lambda_l2 * l2_norm
-
-
 def evaluate_and_save(model, dataloader, dataset_name, output_dir):
     """
     Evaluates the model, saves predictions to a CSV, and plots the results.
@@ -76,9 +71,7 @@ def evaluate_and_save(model, dataloader, dataset_name, output_dir):
     output_csv_path = os.path.join(output_dir,
                                    f"{dataset_name}_predictions_{current_time}_{batch_size}_{learning_rate}.csv")
     with open(output_csv_path, mode='w', newline='') as csv_file:
-        writer = csv.writer(csv_file)
-        fieldnames = ['Actual_Label', 'Predicted_Label']
-        dict_writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+        dict_writer = csv.DictWriter(csv_file, fieldnames=['Actual_Label', 'Predicted_Label'])
         dict_writer.writeheader()
         dict_writer.writerows(predictions_data)
 
@@ -555,8 +548,11 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    if not (abs(train_ratio + val_ratio) < 1.0):
-        print("Warning: Sum of TRAIN_RATIO, VAL_RATIO, TEST_RATIO does not equal 1.0.")
+    if not (0.0 < train_ratio + val_ratio <= 1.0):
+        raise ValueError(
+            "train_ratio + val_ratio must be in (0, 1] so the test split is "
+            f"non-negative. Got train_ratio={train_ratio}, val_ratio={val_ratio}."
+        )
 
     model = build_model(model_selection)
     print(f'Using {ncpus} cpu workers.')

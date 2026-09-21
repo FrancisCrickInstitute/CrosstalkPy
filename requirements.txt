@@ -9,3 +9,6 @@ requests
 pandas
 zarr
 fsspec[http]
+scipy
+scikit-image
+scikit-learn
