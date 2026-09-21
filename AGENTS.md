@@ -205,11 +205,11 @@ re-instantiating the architecture).
 a `.pt` (TorchScript, for external consumers) alongside each other.
 
 Gothca: `torch.jit.script` is deprecated in torch 2.14+ (emits a `FutureWarning`
-on *all* Python versions, not just 3.14), and upstream recommends `torch.export`
-as the replacement. However, `torch.export` shape-specializes its input (batch
-becomes fixed at export time) and rejects other batch sizes. For this
-PyTorch-only, dynamic-batch use case, TorchScript still works and is the
-pragmatic choice. Revisit if a future PyTorch removes `torch.jit`.
+on *all* Python versions) and upstream recommends `torch.export` as the
+replacement. However, `torch.export` shape-specializes its input (batch becomes
+fixed at export time) and rejects other batch sizes. For this PyTorch-only,
+dynamic-batch use case, TorchScript still works and is the pragmatic choice.
+Revisit if a future PyTorch removes `torch.jit`.
 
 ## Weights distribution for pip-installable consumers
 

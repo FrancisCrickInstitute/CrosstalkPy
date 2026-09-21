@@ -108,6 +108,9 @@ def load_torchscript(model_path, device):
     model.eval()
     model.to(device)
     return model
+
+
+def hash_file(path):
     """Return the hex SHA256 digest of a file on disk."""
     h = hashlib.sha256()
     with open(path, "rb") as f:
