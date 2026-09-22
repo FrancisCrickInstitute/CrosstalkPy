@@ -15,7 +15,7 @@ import torch.optim as optim
 import torchvision.transforms.functional as TF
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
-
+import torch
 from model_factory import (
     DOUBLE_MODEL_KWARGS,
     MODEL_VERSION,
