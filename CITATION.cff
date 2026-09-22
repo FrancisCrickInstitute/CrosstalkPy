@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: Barry
+    given-names: Dave
+    email: david.barry@crick.ac.uk
+    affiliation: Francis Crick Institute
+title: "CrosstalkPy"
+abstract: >-
+  A PyTorch model that detects crosstalk (bleed-through) in fluorescence
+  microscopy image pairs. Given a "mixed" channel and its "pure" source channel,
+  it regresses a scalar alpha value in [0,1] describing the crosstalk mixing
+  ratio.
+keywords:
+  - microscopy
+  - crosstalk
+  - deep learning
+  - pytorch
+type: software
+repository-code: "https://github.com/djpbarry/Torch-Unet"
+version: "0.1.0"
