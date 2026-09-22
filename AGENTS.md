@@ -166,8 +166,8 @@ Gotchas:
 ## Conventions & Style
 
 - Plain scripts, no `pytest`/`unittest`, no `setup.py`/`pyproject.toml`. Package
-  structure is flat: model modules at repo root, imported via `from
-  regression_model import *` (star imports).
+  structure is flat: model modules at repo root, imported explicitly (star
+  imports removed).
 - Models subclass `torch.nn.Module`; use `nn.Sequential`; `LeakyReLU(0.01)` and
   `BatchNorm` throughout.
 - Timestamps use `datetime.now().strftime("%Y-%m-%d_%H-%M-%S")` and are embedded
@@ -318,8 +318,10 @@ by running the relevant script.
    `val_test_transforms_fn`, `evaluate_and_save` are copy-pasted between
    `train_model.py` and `test-cross-talk-model.py` (model instantiation is
    already centralized in `model_factory.py`). Extract shared modules.
-5. **Star imports** (`from regression_model import *`, `from two_branch_regression import *`)
-   — fragile; replace with explicit imports.
+5. ~~**Star imports** (`from regression_model import *`, `from two_branch_regression import *`)~~
+   — resolved: removed; the model classes are no longer imported directly (model
+   instantiation moved to `model_factory.py`), so the star imports were dead and
+   are deleted.
 6. **Hardcoded 256×256 input**: `TARGET_IMAGE_SIZE` is defined but not applied
    as a resize; the models assume 256×256 via `_get_conv_output((256,256))` and
    the two-branch dummy input. Non-256 inputs break the FC layer.

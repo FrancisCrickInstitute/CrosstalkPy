@@ -15,8 +15,6 @@ from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
 from model_factory import build_model, load_model
-from regression_model import *
-from two_branch_regression import *
 
 INDEX_PAGE = "https://idr.openmicroscopy.org/webclient/?experimenter=-1"
 

@@ -25,8 +25,6 @@ from model_factory import (
     save_torchscript,
     write_manifest,
 )
-from regression_model import *
-from two_branch_regression import *
 
 TARGET_IMAGE_SIZE = (256, 256)
 
