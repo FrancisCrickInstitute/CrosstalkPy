@@ -68,6 +68,10 @@ python examine_large_errors.py --csv_file <test_predictions_*.csv> --top-n 20
 
 # Re-export distribution artifacts from an existing .pth (no re-training)
 python export_model.py --model-path <checkpoint.pth> [-o single|double]
+
+# Re-run evaluation + plots for an existing .pth (no re-training)
+python evaluate_run.py --model-path <checkpoint.pth> -m <mixed_dir> -s <source_dir> \
+    [-o single|double] [-b 128] [-l 1e-4]
 ```
 
 Key CLI args (see `argparse` in `train_model.py` and `test-cross-talk-model.py`):
@@ -282,6 +286,12 @@ Code changes landed to make the above real:
    `releases/LATEST`) from an **existing** `.pth` without re-training. Useful when
    a training run saved the weights but stopped before the export step (e.g. a
    post-training device error).
+10. `evaluate_run.py` re-runs the train/val/test evaluation (prediction CSVs +
+    scatter PNGs) and re-plots the loss curve from `training_log_*.csv`, again
+    from an existing `.pth`. It reuses `CrosstalkDataset`/`SplitCrosstalkDataset`/
+    `val_test_transforms_fn` by importing from `train_model` (safe: `train_model`
+    guards its `main()` behind `if __name__ == "__main__"`), rather than copying
+    them.
 
 Note: the export/`build_sample_tensors` step runs the model to produce the
 reference `sample_output.npy`; it must move the input onto the model's device
