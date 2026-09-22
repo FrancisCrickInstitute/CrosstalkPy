@@ -5,6 +5,7 @@ import json
 import os
 import re  # Import regex for pattern matching
 import shutil
+import subprocess
 from datetime import datetime
 
 import imageio.v3 as iio
@@ -27,6 +28,38 @@ from model_factory import (
 )
 
 TARGET_IMAGE_SIZE = (256, 256)
+
+
+def git_info():
+    """Return a dict with the current git commit hash, branch, and dirty flag.
+
+    Used for auditability: ties a training run back to the exact code that
+    produced it. Returns N/A strings if git is unavailable or the repo is not
+    under version control (e.g. a source tarball on the cluster).
+    """
+    info = {"git_commit": "N/A", "git_branch": "N/A", "git_dirty": "N/A"}
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if commit.returncode == 0:
+            info["git_commit"] = commit.stdout.strip()
+        branch = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if branch.returncode == 0:
+            info["git_branch"] = branch.stdout.strip()
+        dirty = subprocess.run(
+            ["git", "status", "--porcelain"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if dirty.returncode == 0:
+            info["git_dirty"] = bool(dirty.stdout.strip())
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return info
 
 
 def evaluate_and_save(model, dataloader, dataset_name, output_dir):
@@ -572,12 +605,16 @@ if __name__ == "__main__":
     print(f"Saving all outputs to: {output_dir_name}")
 
     args_dict = vars(args)
+    git_meta = git_info()
     params_list_path = os.path.join(output_dir_name, "params.txt")
     with open(params_list_path, 'w') as f:
         for arg, value in args_dict.items():
             f.write(f'{arg}: {value}\n')
 
-        # Environment / hardware diagnostics
+        # Version-control / hardware diagnostics
+        f.write(f'git_commit: {git_meta["git_commit"]}\n')
+        f.write(f'git_branch: {git_meta["git_branch"]}\n')
+        f.write(f'git_dirty: {git_meta["git_dirty"]}\n')
         f.write(f'device: {device}\n')
         f.write(f'torch_version: {torch.__version__}\n')
         if device.type == "cuda":
@@ -734,6 +771,9 @@ if __name__ == "__main__":
         "val_samples": len(val_samples),
         "test_samples": len(test_samples),
         "loss": "MSELoss",
+        "git_commit": git_meta["git_commit"],
+        "git_branch": git_meta["git_branch"],
+        "git_dirty": git_meta["git_dirty"],
     }
 
     write_manifest(
