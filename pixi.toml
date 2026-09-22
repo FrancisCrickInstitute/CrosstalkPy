@@ -2,13 +2,16 @@
 authors = ["Dave Barry <david.barry@crick.ac.uk>"]
 channels = ["conda-forge"]
 name = "Torch-UNet"
-platforms = ["win-64"]
+platforms = ["win-64", "linux-64"]
 version = "0.1.0"
 
 [tasks]
 
 [dependencies]
 python = "3.13.*"
+
+# Windows-only dev tooling (PyCharm integration); skipped on other platforms.
+[target.win-64.dependencies]
 pixi-pycharm = ">=0.0.12,<0.0.13"
 
 [environments]

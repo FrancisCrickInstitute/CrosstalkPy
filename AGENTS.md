@@ -32,9 +32,13 @@ following are **still missing** from both `pixi.toml` and `requirements.txt`:
 - `scipy`, `scikit-image`, `scikit-learn` — needed by `test-cross-talk-model.py`
   (`pearsonr`, `ssim`, `normalized_mutual_info_score`).
 
-The repo is Windows-targeted (`platforms = ["win-64"]`), but default CLI paths
-in the scripts point at Linux/NEMO HPC mounts (`/nemo/...`, `Z:/working/...`),
-so running on this machine needs explicit `-m`/`-s` args.
+The repo is cross-platform (`platforms = ["win-64", "linux-64"]`): local dev is
+Windows, but training also runs on a Linux cluster. `pixi-pycharm` (PyCharm IDE
+integration) is Windows-only and lives under `[target.win-64.dependencies]` so it
+doesn't block Linux installs. Default CLI paths in the scripts still point at
+Linux/NEMO HPC mounts (`/nemo/...`, `Z:/working/...`), so local Windows runs need
+explicit `-m`/`-s` args. The `pixi.lock` is regenerated per-machine and is NOT
+shipped across platforms.
 
 ## Commands
 
