@@ -1,3 +1,4 @@
+import argparse
 import glob
 import os
 import re
@@ -162,11 +163,23 @@ def save_results_to_csv(results, output_file):
 
 def main():
     """Main function to run the analysis."""
-    # Set the base directory containing your training run subdirectories
-    base_directory = "Z:/working/barryd/hpc/python/Torch-Unet"  # Current directory, change this to your actual path
+    parser = argparse.ArgumentParser(
+        description="Analyse training run directories and compile a results CSV."
+    )
+    parser.add_argument(
+        "--base-directory",
+        default=".",
+        help="Directory containing training_run_* subdirectories (default: current dir)",
+    )
+    parser.add_argument(
+        "--output-file",
+        default="training_analysis_results.csv",
+        help="Output CSV path (default: training_analysis_results.csv)",
+    )
+    args = parser.parse_args()
 
-    # Output file name
-    output_file = "training_analysis_results.csv"
+    base_directory = args.base_directory
+    output_file = args.output_file
 
     print("Starting training analysis...")
     print(f"Looking for training directories in: {os.path.abspath(base_directory)}")

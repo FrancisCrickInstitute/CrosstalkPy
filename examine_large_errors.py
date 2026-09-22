@@ -256,8 +256,8 @@ def main():
     )
     parser.add_argument(
         "--csv_file",
-        default="Z:/working/barryd/hpc/python/Torch-Unet/eval_run_2025-12-16_09-45-57/test_predictions_2025-12-16_09-45-58.csv",
-        help="Path to the CSV file with predictions"
+        required=True,
+        help="Path to the test_predictions_*.csv written by test-cross-talk-model.py",
     )
     parser.add_argument(
         "--output-dir",

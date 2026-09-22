@@ -328,10 +328,9 @@ by running the relevant script.
 7. ~~**Missing declared dependencies** (`test-cross-talk-model.py`)~~ — fixed:
    `scipy`, `scikit-image`, `scikit-learn` are now declared in both `pixi.toml`
    and `requirements.txt`.
-8. **Hardcoded paths**: `analyse_training_results.py` (`base_directory`) and
-   `examine_large_errors.py` (`--csv_file` default) both point at
-   `Z:/working/barryd/hpc/python/Torch-Unet`; neither is CLI-driven for its base
-   path.
+8. ~~**Hardcoded paths**~~ — resolved: `analyse_training_results.py` now takes
+   `--base-directory` (default `.`) and `--output-file`; `examine_large_errors.py`
+   takes a required `--csv_file` (no baked-in HPC path).
 9. ~~**Dead code in `evaluate_and_save`** (`train_model.py` version)~~ — removed
    the unused `csv.writer` and `fieldnames` local.
 10. **Weights versioning/release partially done**: `MODEL_VERSION`, per-run
