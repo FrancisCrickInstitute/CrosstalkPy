@@ -146,8 +146,11 @@ def build_sample_tensors(model, output_dir, seed=0, batch_size=1):
     sample_input = rng.random((batch_size, 2, 256, 256), dtype=np.float32)
 
     model.eval()
+    # Move the input onto the model's device (the model may live on CUDA while
+    # the numpy array is on CPU).
+    device = next(model.parameters()).device
     with torch.no_grad():
-        sample_output = model(torch.from_numpy(sample_input)).cpu().numpy()
+        sample_output = model(torch.from_numpy(sample_input).to(device)).cpu().numpy()
 
     input_path = os.path.join(output_dir, "sample_input.npy")
     output_path = os.path.join(output_dir, "sample_output.npy")
