@@ -62,7 +62,7 @@ A number of options can be specified:
   -s, --pure_source_data_dir PURE_SOURCE_DATA_DIR
                         Directory for pure source data
   -p, --model_path MODEL_PATH
-                        Path to trained model. To use the model in this repository, set this to ./PreTrained_Model/crosstalk_regression_model_trained_2025-12-15_18-22-01_256_0.0005.pth
+                        Path to trained model. To use the model in this repository, set this to ./PreTrained_Model/crosstalk_regression_model_v1.0.0_2026-09-22_14-42-47_128_0.0005.pth
   -j, --cpu_jobs CPU_JOBS
                         Number of CPUs to use
   -o, --model_options {single,double}
@@ -128,6 +128,35 @@ For convenience, the `.pt`, manifest, and sample tensors are also copied to
 `releases/v<version>/`, and `releases/LATEST` points at the current manifest so
 consumers can resolve the latest artifacts without parsing timestamps.
 
+### Getting the model weights
+
+The weights are distributed as **GitHub Releases** (not committed to the
+repository), so other projects can download them on demand. The current release
+is `v1.0.0` and bundles the `.pt` TorchScript model, the `.pth` state_dict, the
+`model_manifest_v1.0.0_*.json`, and the `sample_input.npy` / `sample_output.npy`
+verification pair.
+
+To download and verify the `.pt` (the recommended handoff artifact):
+
+```bash
+# Download
+curl -L -o crosstalk_regression_model_v1.0.0.pt \
+  https://github.com/djpbarry/Torch-Unet/releases/download/v1.0.0/crosstalk_regression_model_v1.0.0_2026-09-22_14-42-47_128_0.0005.pt
+
+# Verify integrity (compare to the sha256 in the release manifest)
+echo "5f29b254b3ead78101d3f896fc69ecfae205d5695ded0a9558341c2a1e4ef8fb  crosstalk_regression_model_v1.0.0.pt" | sha256sum -c -
+```
+
+The full manifest (`model_manifest_v1.0.0_*.json`) lists the SHA256 of every
+artifact so a consumer can verify any download:
+
+| Artifact | SHA256 |
+| --- | --- |
+| `crosstalk_regression_model_v1.0.0_..._128_0.0005.pt` | `5f29b254b3ead78101d3f896fc69ecfae205d5695ded0a9558341c2a1e4ef8fb` |
+| `crosstalk_regression_model_v1.0.0_..._128_0.0005.pth` | `9e4426919392ef707d8662640d4fe21cf83b85accad52f76a31fe7569db5cfee` |
+| `sample_input.npy` | `4c3d7ca2f2c7649c10eef2256c1c2ebee9d03e056c902cd93de701f2b3769853` |
+| `sample_output.npy` | `6045d356648bbb754f69c9e8a6ecf66b080bb702ed324fbb8b5d81999d91d834` |
+
 > **Note:** the TorchScript `.pt` is produced via `torch.jit.script`, which is
 > deprecated in torch 2.14+ (it emits a `FutureWarning`) in favour of
 > `torch.export`. It still works and keeps the batch size dynamic, which is why
@@ -150,5 +179,23 @@ model.eval()
 # Output: [batch, 1] scalar crosstalk alpha in [0, 1].
 with torch.no_grad():
     alpha = model(input_tensor)
+```
+
+You can confirm your download + load is correct by feeding the reference
+`sample_input.npy` and comparing the output to `sample_output.npy`:
+
+```python
+import numpy as np
+import torch
+
+model = torch.jit.load("crosstalk_regression_model_v1.0.0.pt").eval()
+x = torch.from_numpy(np.load("sample_input.npy"))
+expected = np.load("sample_output.npy")
+
+with torch.no_grad():
+    out = model(x).numpy()
+
+assert np.allclose(out, expected, atol=1e-5), "mismatch — check the model file"
+print("Model verified against reference output.")
 ```
 
