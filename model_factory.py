@@ -157,7 +157,7 @@ def build_sample_tensors(model, output_dir, seed=0, batch_size=1):
 
 
 def write_manifest(manifest_path, artifact_files, model_selection, model_kwargs,
-                   sample_tensors=None):
+                   sample_tensors=None, training_config=None):
     """Write a JSON manifest describing exported model artifacts.
 
     Args:
@@ -169,6 +169,9 @@ def write_manifest(manifest_path, artifact_files, model_selection, model_kwargs,
         sample_tensors (dict, optional): Mapping of descriptor -> relative
             filename for sample input/output tensors (from
             `build_sample_tensors`). Recorded with SHA256 digests.
+        training_config (dict, optional): Training hyperparameters (learning
+            rate, batch size, scheduler, split ratios, etc.) recorded verbatim
+            so a run can be reconstructed/audited later.
     """
     base_dir = os.path.dirname(manifest_path)
     entries = {}
@@ -195,6 +198,9 @@ def write_manifest(manifest_path, artifact_files, model_selection, model_kwargs,
             key: {"file": filename, "sha256": hash_file(os.path.join(base_dir, filename))}
             for key, filename in sample_tensors.items()
         }
+
+    if training_config:
+        manifest["training_config"] = training_config
 
     with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2)
