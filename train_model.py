@@ -420,11 +420,12 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, num_epoch
         writer.writerow(['Batch Size', batch_size])
         writer.writerow(['Scheduler Type', scheduler_config['type']])
         writer.writerow(['Scheduler Params', str(scheduler_config['params'])])
-        writer.writerow(['epoch', 'train_loss', 'val_loss', 'learning_rate'])  # write header
+        writer.writerow(['epoch', 'train_loss', 'val_loss', 'learning_rate', 'grad_norm'])  # write header
 
         for epoch in range(num_epochs):
             model.train()
             train_loss = 0.0
+            grad_norm = 0.0
 
             # Get current learning rate
             current_lr = optimizer.param_groups[0]['lr']
@@ -446,6 +447,14 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, num_epoch
                 # Step OneCycleLR after each batch
                 if scheduler_config['type'] == 'onecycle':
                     scheduler.step()
+
+            # Gradient L2 norm after the final batch of the epoch (diagnostic only:
+            # helps spot exploding gradients before loss turns NaN/inf).
+            grad_norm = sum(
+                p.grad.detach().pow(2).sum().item()
+                for p in model.parameters()
+                if p.grad is not None
+            ) ** 0.5
 
             train_loss /= len(train_loader.dataset)
             train_losses.append(train_loss)
@@ -482,10 +491,10 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, num_epoch
 
             current_lr = optimizer.param_groups[0]['lr']
             print(
-                f"Epoch [{epoch + 1}/{num_epochs}] | Train Loss: {train_loss:.6f} | Val Loss: {val_loss:.6f} | LR: {current_lr:.2e}")
+                f"Epoch [{epoch + 1}/{num_epochs}] | Train Loss: {train_loss:.6f} | Val Loss: {val_loss:.6f} | LR: {current_lr:.2e} | GradNorm: {grad_norm:.2e}")
 
             # Log to CSV
-            writer.writerow([epoch + 1, train_loss, val_loss, current_lr])
+            writer.writerow([epoch + 1, train_loss, val_loss, current_lr, grad_norm])
 
             # Early stopping
             if epochs_without_improvement >= early_stop_patience:
