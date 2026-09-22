@@ -8,29 +8,40 @@ We developed CrosstalkPy because standard measures of cross-talk, such as Pearso
 
 ## Setup
 
-### Step 1: Install a Python Distribution
+The project is managed with [pixi](https://pixi.sh) (`pixi.toml` + `pixi.lock`),
+which is the intended environment tool. A `requirements.txt` is also provided
+for a plain `conda`/`pip` workflow as a fallback.
 
-We recommend using conda as it's relatively straightforward and makes the management of different Python environments simple. You can install conda from [here](https://conda.io/projects/conda/en/latest/user-guide/install/index.html#regular-installation) (miniconda will suffice).
+### Option A: pixi (recommended)
 
-### Step 2: Set Up Environment
+Install pixi, then from the repo root:
 
-Once conda is installed, open a terminal (Mac) or AnaConda Prompt (Windows) and run the following series of commands:
+```
+pixi install
+pixi run -e crosstalk python <script>.py [args...]
+```
+
+The `crosstalk` environment provides Python 3.13 and all Python dependencies.
+
+### Option B: conda + pip
 
 ```
 conda create --name crosstalk-detection python=3.13
 conda activate crosstalk-detection
 python -m pip install -r <path to this repo>/requirements.txt
 ```
-where you need to replace `<path to this repo>` with the location on your file system where you downloaded this repo. You will be presented with a list of packages to be downloaded and installed. The following prompt will appear:
-```
-Proceed ([y]/n)?
-```
-Hit Enter and all necessary packages will be downloaded and installed - this may take some time. When complete, you can deactivate the environment you have created with the following command.
 
-```
-conda deactivate
-```
-You have successfully set up your environment!
+Replace `<path to this repo>` with the on-disk location of the repository.
+
+### Hardware / GPU note
+
+Training assumes a CUDA-capable GPU. Note two things:
+
+- The default `batch_size` of **256** can exhaust GPU memory during training on an
+  A100 (the model materialises an 8 GiB intermediate activation map), causing a
+  `CUDACachingAllocator` out-of-memory error. Use `-b 128` (or smaller) instead.
+- The bundled torch is built for CUDA 12.6. The training GPU driver must support
+  CUDA >= 12.6, otherwise torch silently falls back to CPU (`Using device: cpu`).
 
 ## Evaluation
 
@@ -104,12 +115,23 @@ plus a manifest, into the training run directory:
   the model class or its constructor arguments.
 - `model_manifest_v<version>_<timestamp>.json` — the model version, the input/
   output contract (a 2×256×256 input where channel 0 is the "mixed" image and
-  channel 1 is the "source" image, and a scalar `alpha` output in `[0, 1]`), and
-  a SHA256 digest of each artifact for download verification.
+  channel 1 is the "source" image, and a scalar `alpha` output in `[0, 1]`),
+  the training hyperparameters, and a SHA256 digest of each artifact for
+  download verification.
+- `sample_input.npy` and `sample_output.npy` — a deterministic input/output pair
+  so a consumer can self-verify their loaded model reproduces the reference
+  output (both are SHA256-hashed in the manifest).
 
-For convenience, the `.pt` and manifest are also copied to
+For convenience, the `.pt`, manifest, and sample tensors are also copied to
 `releases/v<version>/`, and `releases/LATEST` points at the current manifest so
 consumers can resolve the latest artifacts without parsing timestamps.
+
+> **Note:** the TorchScript `.pt` is produced via `torch.jit.script`, which is
+> deprecated in torch 2.14+ (it emits a `FutureWarning`) in favour of
+> `torch.export`. It still works and keeps the batch size dynamic, which is why
+> it is used here; revisit if a future PyTorch removes `torch.jit`.
+
+A `CITATION.cff` at the repo root provides machine-readable citation metadata.
 
 ### Loading the exported model
 
