@@ -302,7 +302,7 @@ if __name__ == "__main__":
         shuffle=False,
         num_workers=ncpus,
         pin_memory=True,
-        drop_last=True
+        drop_last=False
     )
 
     print("Dataloader created for testing.")

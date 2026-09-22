@@ -305,10 +305,11 @@ by running the relevant script.
    `ValueError` otherwise.
 2. ~~**`l2_regularization` is dead code** (`train_model.py`)~~ — removed
    (regularizer is `weight_decay=1e-4` in the Adam optimizer).
-3. **`drop_last=True` silently drops samples**: all three `DataLoader`s (train/
-   val/test) drop the final partial batch, but loss is normalized by
-   `len(dataloader.dataset)`, so reported losses undercount on small datasets.
-   Decide intended behavior.
+3. ~~**`drop_last=True` silently drops samples**~~ — resolved: val/test loaders
+   now use `drop_last=False` (evaluate every sample); the train loader keeps
+   `drop_last=True` for uniform batches but a guard clamps `batch_size` to the
+   train-set size when it would otherwise yield zero batches (as happens with the
+   100-image repo sample at the default `batch_size=256`).
 4. **Remaining code duplication**: `CrosstalkDataset`, `normalize_image`,
    `val_test_transforms_fn`, `evaluate_and_save` are copy-pasted between
    `train_model.py` and `test-cross-talk-model.py` (model instantiation is

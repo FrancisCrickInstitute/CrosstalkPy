@@ -624,6 +624,18 @@ if __name__ == "__main__":
         split_samples=test_samples
     )
 
+    # Guard against a batch size larger than the training set: with drop_last
+    # enabled, that would make the train loader yield zero batches and the
+    # training loop silently do nothing. Clamp to the train set size so small
+    # datasets (e.g. the 100-image repo sample) still train.
+    if batch_size > len(train_dataset_final):
+        print(
+            f"Warning: batch_size {batch_size} exceeds the training set size "
+            f"({len(train_dataset_final)}). Clamping batch_size to "
+            f"{len(train_dataset_final)} for this run."
+        )
+        batch_size = len(train_dataset_final)
+
     train_dataloader = DataLoader(
         train_dataset_final,
         batch_size=batch_size,
@@ -639,7 +651,7 @@ if __name__ == "__main__":
         shuffle=False,
         num_workers=ncpus,
         pin_memory=True,
-        drop_last=True
+        drop_last=False
     )
 
     test_dataloader = DataLoader(
@@ -648,7 +660,7 @@ if __name__ == "__main__":
         shuffle=False,
         num_workers=ncpus,
         pin_memory=True,
-        drop_last=True
+        drop_last=False
     )
 
     print("Dataloaders created for training, validation, and testing.")
