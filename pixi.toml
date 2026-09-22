@@ -2,7 +2,7 @@
 authors = ["Dave Barry <david.barry@crick.ac.uk>"]
 channels = ["conda-forge"]
 name = "Torch-UNet"
-platforms = ["win-64", "linux-64"]
+platforms = ["win-64", { platform = "linux-64", cuda = "12.6" }]
 version = "0.1.0"
 
 [tasks]
@@ -19,10 +19,8 @@ crosstalk = ["default"]
 
 [pypi-dependencies]
 numpy = ">=2.5.2, <3"
-torch = ">=2.14.0, <3"
 matplotlib = ">=3.11.1, <4"
 pillow = ">=12.3.0, <13"
-torchvision = ">=0.29.0, <0.30"
 imageio = ">=2.37.4, <3"
 tqdm = ">=4.70.0, <5"
 pandas = ">=3.0.5, <4"
@@ -31,3 +29,15 @@ zarr = ">=3.3.0, <4"
 scipy = ">=1.18.1, <2"
 scikit-image = ">=0.26.0, <0.27"
 scikit-learn = ">=1.9.1, <2"
+
+# Linux (cluster): CUDA 12.6 torch, pulled from the PyTorch cu126 wheel index so
+# we match the HPC driver (max CUDA 12.6). The default PyPI torch wheel now
+# bundles CUDA 13.x, which fails to initialise on a 12.6 driver.
+[target.linux-64.pypi-dependencies]
+torch = { version = ">=2.14.0, <3", index = "https://download.pytorch.org/whl/cu126" }
+torchvision = { version = ">=0.29.0, <0.30", index = "https://download.pytorch.org/whl/cu126" }
+
+# Windows (local dev): CPU-only torch from PyPI (no GPU required).
+[target.win-64.pypi-dependencies]
+torch = ">=2.14.0, <3"
+torchvision = ">=0.29.0, <0.30"

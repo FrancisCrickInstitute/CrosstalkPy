@@ -32,13 +32,19 @@ following are **still missing** from both `pixi.toml` and `requirements.txt`:
 - `scipy`, `scikit-image`, `scikit-learn` — needed by `test-cross-talk-model.py`
   (`pearsonr`, `ssim`, `normalized_mutual_info_score`).
 
-The repo is cross-platform (`platforms = ["win-64", "linux-64"]`): local dev is
-Windows, but training also runs on a Linux cluster. `pixi-pycharm` (PyCharm IDE
-integration) is Windows-only and lives under `[target.win-64.dependencies]` so it
-doesn't block Linux installs. Default CLI paths in the scripts still point at
-Linux/NEMO HPC mounts (`/nemo/...`, `Z:/working/...`), so local Windows runs need
-explicit `-m`/`-s` args. The `pixi.lock` is regenerated per-machine and is NOT
-shipped across platforms.
+The repo is cross-platform (`platforms = ["win-64", { platform = "linux-64",
+cuda = "12.6" }]`): local dev is Windows (CPU-only torch), and training runs on a
+Linux HPC cluster whose NVIDIA driver tops out at CUDA 12.6. Torch is split by
+platform: Linux pulls `torch`/`torchvision` from the PyTorch `cu126` wheel index
+(`index = "https://download.pytorch.org/whl/cu126"`), Windows uses the plain
+PyPI wheel (CPU). This matters because PyPI's **default** torch wheel (2.11+)
+bundles CUDA 13.x, which won't initialise on a 12.6 driver.
+
+`pixi-pycharm` (PyCharm IDE integration) is Windows-only and lives under
+`[target.win-64.dependencies]` so it doesn't block Linux installs. Default CLI
+paths in the scripts still point at Linux/NEMO HPC mounts (`/nemo/...`,
+`Z:/working/...`), so local Windows runs need explicit `-m`/`-s` args. The
+`pixi.lock` is regenerated per-machine and is NOT shipped across platforms.
 
 ## Commands
 
