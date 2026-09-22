@@ -65,6 +65,9 @@ python analyse_training_results.py
 
 # Download top-N worst predictions from IDR (reads an eval CSV; see below)
 python examine_large_errors.py --csv_file <test_predictions_*.csv> --top-n 20
+
+# Re-export distribution artifacts from an existing .pth (no re-training)
+python export_model.py --model-path <checkpoint.pth> [-o single|double]
 ```
 
 Key CLI args (see `argparse` in `train_model.py` and `test-cross-talk-model.py`):
@@ -274,6 +277,16 @@ Code changes landed to make the above real:
 8. `CITATION.cff` at repo root provides machine-readable citation metadata
    (author, title, `repository-code`). No `license` key yet — add one when a
    LICENSE file is chosen.
+9. `export_model.py` re-generates the distribution artifacts (`.pt` TorchScript,
+   `sample_input/output.npy`, manifest, `releases/v<version>/` copies, and
+   `releases/LATEST`) from an **existing** `.pth` without re-training. Useful when
+   a training run saved the weights but stopped before the export step (e.g. a
+   post-training device error).
+
+Note: the export/`build_sample_tensors` step runs the model to produce the
+reference `sample_output.npy`; it must move the input onto the model's device
+(CUDA on the cluster) or it raises a `FloatTensor`/`cuda.FloatTensor` type
+mismatch. Fixed in `model_factory.build_sample_tensors`.
 
 Open questions resolved:
 
