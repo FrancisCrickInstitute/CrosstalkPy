@@ -694,6 +694,24 @@ if __name__ == "__main__":
     # their own loading/inference against a known-good reference output.
     sample_tensors = build_sample_tensors(model, output_dir_name)
 
+    # Record training hyperparameters for audit/reproducibility.
+    training_config = {
+        "optimizer": "Adam",
+        "learning_rate": learning_rate,
+        "weight_decay": 1e-4,
+        "batch_size": batch_size,
+        "num_epochs": num_epochs,
+        "learning_scheduler": learning_scheduler,
+        "train_ratio": train_ratio,
+        "val_ratio": val_ratio,
+        "split_seed": 43,
+        "total_samples": total_samples,
+        "train_samples": len(train_samples),
+        "val_samples": len(val_samples),
+        "test_samples": len(test_samples),
+        "loss": "MSELoss",
+    }
+
     write_manifest(
         manifest_path,
         {
@@ -703,6 +721,7 @@ if __name__ == "__main__":
         model_selection,
         model_kwargs,
         sample_tensors=sample_tensors,
+        training_config=training_config,
     )
     print(f"Model manifest saved to {manifest_path}")
 
