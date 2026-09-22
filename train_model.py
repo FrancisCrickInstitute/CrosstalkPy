@@ -577,6 +577,21 @@ if __name__ == "__main__":
         for arg, value in args_dict.items():
             f.write(f'{arg}: {value}\n')
 
+        # Environment / hardware diagnostics
+        f.write(f'device: {device}\n')
+        f.write(f'torch_version: {torch.__version__}\n')
+        if device.type == "cuda":
+            f.write(f'cuda_version: {torch.version.cuda}\n')
+            f.write(f'cudnn_version: {torch.backends.cudnn.version()}\n')
+            f.write(f'gpu_count: {torch.cuda.device_count()}\n')
+            for i in range(torch.cuda.device_count()):
+                f.write(f'gpu_{i}_name: {torch.cuda.get_device_name(i)}\n')
+                f.write(f'gpu_{i}_capability: {torch.cuda.get_device_capability(i)}\n')
+                total_mem = torch.cuda.get_device_properties(i).total_memory
+                f.write(f'gpu_{i}_total_memory_gb: {total_mem / 1024**3:.2f}\n')
+        else:
+            f.write('cpu: available (no CUDA GPU detected)\n')
+
     print(f"Parameters saved to {params_list_path}")
 
     # --- Save Model Architecture Summary ---
