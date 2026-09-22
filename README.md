@@ -1,6 +1,6 @@
 # CrosstalkPy: A Python Package to Detect CrossTalk in Microscopy Images
 
-[![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/) [![Built with Pixi](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/prefix-dev/pixi/main/assets/badge/v0.json)](https://pixi.sh) ![Commit activity](https://img.shields.io/github/commit-activity/y/djpbarry/Torch-Unet?style=plastic) ![GitHub](https://img.shields.io/github/license/djpbarry/Torch-Unet?color=green&style=plastic)
+[![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/) [![Built with Pixi](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/prefix-dev/pixi/main/assets/badge/v0.json)](https://pixi.sh) ![Commit activity](https://img.shields.io/github/commit-activity/y/FrancisCrickInstitute/CrosstalkPy?style=plastic) ![GitHub](https://img.shields.io/github/license/FrancisCrickInstitute/CrosstalkPy?color=green&style=plastic)
 
 <img width="45%" alt="test_Pearsons Correlation_plot_2025-12-16_11-37-05" src="https://github.com/user-attachments/assets/3aeb6b4c-2415-4a15-8c12-c233ca11a0a5" /> <img width="45%" alt="test_Predicted_Label_plot_2025-12-16_11-37-05" src="https://github.com/user-attachments/assets/a18fe6b7-86c4-4c4e-be43-7305e45f8b7f" />
 
@@ -141,7 +141,7 @@ To download and verify the `.pt` (the recommended handoff artifact):
 ```bash
 # Download
 curl -L -o crosstalk_regression_model_v1.0.0.pt \
-  https://github.com/djpbarry/Torch-Unet/releases/download/v1.0.0/crosstalk_regression_model_v1.0.0_2026-09-22_14-42-47_128_0.0005.pt
+  https://github.com/FrancisCrickInstitute/CrosstalkPy/releases/download/v1.0.0/crosstalk_regression_model_v1.0.0_2026-09-22_14-42-47_128_0.0005.pt
 
 # Verify integrity (compare to the sha256 in the release manifest)
 echo "5f29b254b3ead78101d3f896fc69ecfae205d5695ded0a9558341c2a1e4ef8fb  crosstalk_regression_model_v1.0.0.pt" | sha256sum -c -
