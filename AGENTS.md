@@ -192,6 +192,32 @@ Gotchas:
 - Filenames are the source of truth for labels and pairing — never assume a
   separate manifest exists.
 
+## Training notes (batch size, OOM, and LR)
+
+Training the `single` model (`initial_filters=128, num_conv_blocks=6`) on the
+cluster has two practical constraints worth recording:
+
+- **`batch_size=256` OOMs on an A100.** The model materialises a single 8 GiB
+  activation map (`512 channels × 128×128 × batch` from conv block 2), which
+  fragments the `CUDACachingAllocator` and fails with a `memory allocation
+  failed with OOM` error even on an otherwise-empty 80 GB card. Use `-b 128`
+  (or smaller). Gradient checkpointing was *not* added; if batch 256 is ever
+  required again, wrapping the conv blocks in `torch.utils.checkpoint` is the fix.
+
+- **Batch size dominates LR for final quality.** Across comparable runs, `-b 256
+  -l 0.0005` reached test RMSE ≈ 0.066 / corr ≈ 0.892, while `-b 128 -l 0.0005`
+  reached test RMSE ≈ 0.071 / corr ≈ 0.875 (`-l 0.0001` was notably worse, RMSE
+  ≈ 0.073). The gap is from batch 256's smoother gradients, not the learning
+  rate. Restoring `-l 0.0005` at batch 128 recovered most (but not all) of the
+  original quality; the residual difference is accepted as the cost of the OOM
+  workaround.
+
+(For context, the runs compared were
+`training_run_2025-12-15_16-02-16_B256_LR0.0005`,
+`training_run_2026-09-22_10-45-55_B128_LR0.0001`, and
+`training_run_2026-09-22_13-05-16_B128_LR0.0005`; the latter is the current
+"latest" model.)
+
 ## Downstream consumers of the model checkpoint
 
 The trained checkpoint `crosstalk_regression_model_trained_*.pth` is a **shared
@@ -370,11 +396,11 @@ by running the relevant script.
 11. **`examine_large_errors.py` not yet validated end-to-end**: deps (`requests`,
     `zarr`, `pandas`) are now installed, but it still requires network access to
     IDR and has not been run in this repo.
-12. **README needs a post-retrain update** (not yet done — pending a full model
-    re-run): once a new checkpoint is trained and exported, update the
-    `test-cross-talk-model.py` `-p` suggestion in the README's Evaluation section
-    (currently points at the old
-    `crosstalk_regression_model_trained_2025-12-15_18-22-01_256_0.0005.pth`)
-    and/or commit the new `releases/` artifacts + `LATEST` pointer. Also confirm
-    the README's `conda`-based setup stays consistent with whichever package
-    manager (`pixi.toml` vs `requirements.txt`) is canonical.
+12. **README needs a post-retrain update** (in progress — a new checkpoint exists
+    as of 2026-09-22): update the `test-cross-talk-model.py` `-p` suggestion in the
+    README's Evaluation section (currently points at the old
+    `crosstalk_regression_model_trained_2025-12-15_18-22-01_256_0.0005.pth`) to
+    point at the new `crosstalk_regression_model_v1.0.0_2026-09-22_14-42-47_128_0.0005.pth`
+    (or `releases/LATEST`). Also decide whether to promote the new checkpoint into
+    `PreTrained_Model/`, and confirm the README's `conda`/`pixi` framing matches
+    whichever package manager is canonical.
